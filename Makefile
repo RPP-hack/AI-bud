@@ -1,0 +1,16 @@
+.PHONY: test integration coverage vet fmt up down
+test:
+	cd services/api && go test -race ./...
+integration:
+	cd services/api && go test -race -count=1 -tags=integration ./...
+coverage:
+	cd services/api && go test -race -count=1 -tags=integration -coverpkg=./... -coverprofile=coverage.out ./...
+	cd services/api && go tool cover -func=coverage.out
+vet:
+	cd services/api && go vet -tags=integration ./...
+fmt:
+	cd services/api && go fmt ./...
+up:
+	docker compose up --build -d
+down:
+	docker compose down
