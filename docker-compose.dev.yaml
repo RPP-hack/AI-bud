@@ -1,0 +1,11 @@
+name: rpp-buddy
+services:
+  rpp-buddy-gateway:
+    image: caddy:latest
+    container_name: rpp-buddy-gateway
+    ports:
+      - "80:80"
+    volumes:
+      - ./gateway:/etc/caddy
+      - ./frontend:/var/www/html
+    
