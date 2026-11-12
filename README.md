@@ -1,2 +1,4 @@
 # AI-bud
-AI intern integration and onboarding service 
+
+AI-помощник для адаптации стажёров.
+
