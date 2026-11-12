@@ -1,8 +1,0 @@
-[run]
-source = rag/src/rag
-relative_files = True
-
-[report]
-precision = 2
-fail_under = 80.01
-show_missing = True
