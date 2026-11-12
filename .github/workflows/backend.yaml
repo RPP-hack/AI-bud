@@ -1,9 +1,9 @@
 name: Backend
 on:
   push:
-    paths: ['services/api/**', '.github/workflows/backend.yaml', 'compose.yaml', 'Makefile']
+    paths: [ '../../backend/services/api/**', '.github/workflows/backend.yaml', '../../backend/compose.yaml', '../../backend/Makefile' ]
   pull_request:
-    paths: ['services/api/**', '.github/workflows/backend.yaml', 'compose.yaml', 'Makefile']
+    paths: [ '../../backend/services/api/**', '.github/workflows/backend.yaml', '../../backend/compose.yaml', '../../backend/Makefile' ]
 jobs:
   test:
     runs-on: ubuntu-latest
