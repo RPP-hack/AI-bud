@@ -94,18 +94,16 @@ class SQLiteStore:
                                (row.lastrowid, title_terms, " ".join(search_terms(chunk.text))))
 
     def search(self, terms, audience, top_k, today: date):
-        # Tokens originate from the tokenizer, never from raw FTS query syntax.
         match = " OR ".join(f'"{term}"' for term in terms)
         params = dict(role=audience.role, team=audience.team, match=match, today=today.isoformat())
         with self.connect(read_only=True) as db:
-            db.execute("BEGIN")  # both the ranked search and rule expansion see one ACL snapshot
+            db.execute("BEGIN")
             rows = db.execute(f"""
                 SELECT {_COLUMNS}, bm25(passages, 3.0, 1.0) AS rank,
                        title_terms, body_terms FROM passages
                 JOIN chunks c ON c.id = passages.rowid JOIN documents d USING(version_id)
                 WHERE {_VISIBLE} AND passages MATCH :match ORDER BY rank, d.document_id, c.id
             """, params)
-            # Avoid claiming a match for "стоимость лицензии Jira" on "Jira" alone.
             wanted = set(terms)
             selected = []
             best_overlap = len(wanted) // 2 + 1
@@ -117,8 +115,6 @@ class SQLiteStore:
                     best_overlap = overlap
                 if overlap == best_overlap and len(selected) < top_k:
                     selected.append(row)
-            # A generic rule and a team exception can disagree even if only one
-            # matched the wording or survived top_k. Include both original sources.
             keys = {row["rule_key"] for row in selected if row["rule_key"] and
                     (row["review_by"] is None or row["review_by"] >= params["today"])}
             for key in sorted(keys):

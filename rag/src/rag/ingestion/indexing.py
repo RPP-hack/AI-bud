@@ -12,7 +12,18 @@ from ..storage import ROLES, SOURCE_TYPES, SQLiteStore
 from .chunking import chunk_pages
 from .loaders import load_document
 
-DEMO_MANIFEST = Path(__file__).resolve().parents[2] / "knowledge" / "manifest.json"
+
+def _find_demo_manifest():
+    package_dir = Path(__file__).resolve().parents[1]
+    # Installed wheels include the corpus in rag/knowledge.
+    installed = package_dir / "knowledge" / "manifest.json"
+    if installed.is_file():
+        return installed
+    # Source checkouts keep the same corpus alongside src/.
+    return package_dir.parents[1] / "knowledge" / "manifest.json"
+
+
+DEMO_MANIFEST = _find_demo_manifest()
 _REQUIRED = {"id", "path", "title", "source_type", "origin", "team", "roles"}
 _OPTIONAL = {"review_by", "source_url", "rule_key", "rule_value"}
 INDEX_VERSION = 1  # bump when normalization changes so the FTS rows are rebuilt

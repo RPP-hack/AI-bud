@@ -8,4 +8,17 @@ services:
     volumes:
       - ./gateway:/etc/caddy
       - ./frontend:/var/www/html
-    
+  rag:
+    profiles: ["rag"]
+    build:
+      context: ./rag
+      target: demo
+    environment:
+      RAG_LLM_API_KEY: "${RAG_LLM_API_KEY:-}"
+      RAG_LLM_BASE_URL: "${RAG_LLM_BASE_URL:-https://openrouter.ai/api/v1}"
+      RAG_LLM_MODEL: "${RAG_LLM_MODEL:-openai/gpt-4o-mini}"
+    volumes:
+      - rag-data:/data
+
+volumes:
+  rag-data:

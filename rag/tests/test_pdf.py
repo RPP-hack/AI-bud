@@ -4,13 +4,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from rag.ingestion import loaders
 from rag.ingestion.indexing import index_manifest
 from rag.ingestion.loaders import load_pdf
 from rag.retrieval import Retriever
 from rag.storage import Audience, SQLiteStore
 
 
-@unittest.skipUnless(importlib.util.find_spec("pypdf"), "install requirements-pdf.txt for PDF tests")
+@unittest.skipUnless(importlib.util.find_spec("pypdf"), "install the pdf extra for PDF tests")
 class PdfTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
@@ -37,7 +38,7 @@ class PdfTests(unittest.TestCase):
         manifest.write_text('[{"id":"guide","path":"test.pdf","title":"Demo","origin":"demo",'
                             '"source_type":"runbook","team":"demo","roles":["intern"]}]')
         store = SQLiteStore(self.root / "test.sqlite3")
-        with self.assertLogs("rag.ingestion.loaders", level="WARNING"):
+        with self.assertLogs(loaders.logger, level="WARNING"):
             index_manifest(manifest, store, ocr=False)
         hit = Retriever(store).retrieve("Jira", audience=Audience("intern", "demo"))[0]
         self.assertEqual((hit.page_number, hit.text, hit.extraction_method), (2, "Jira onboarding", "text"))
@@ -57,5 +58,5 @@ class PdfTests(unittest.TestCase):
         page = load_pdf(self.pdf, ocr_language="eng")[0]
         self.assertEqual(page.extraction_method, "ocr")
         self.assertIn("PROJECT ACCESS", page.text.upper())
-        with self.assertLogs("rag.ingestion.loaders", level="WARNING"), self.assertRaises(ValueError):
+        with self.assertLogs(loaders.logger, level="WARNING"), self.assertRaises(ValueError):
             load_pdf(self.pdf, ocr=False)

@@ -1,4 +1,4 @@
-"""Generate grounded answers through the a configurable OpenAI-compatible chat endpoint."""
+"""Generate grounded answers through the configurable OpenAI-compatible chat endpoint."""
 
 from __future__ import annotations
 

@@ -4,7 +4,6 @@ from datetime import date
 
 from .storage import Audience
 
-# Demo identities stand in for the authenticated session from the hosting backend.
 PROFILES = {
     "intern-platform": Audience("intern", "platform"),
     "mentor-platform": Audience("mentor", "platform"),
@@ -23,8 +22,6 @@ def request_access(store, employee, *, confirm=False):
         raise PermissionError("Эта операция недоступна для текущего профиля.")
     with store.connect(read_only=not confirm) as db:
         db.execute("BEGIN IMMEDIATE" if confirm else "BEGIN")
-        # A changed audience, retired guide or unresolved rule disables submission,
-        # even if the caller kept a draft from before the last index update.
         rows = db.execute("""
             SELECT document_id, rule_value FROM documents d
             WHERE current = 1 AND (team = '*' OR team = ?) AND rule_key = 'jira.bud.read'

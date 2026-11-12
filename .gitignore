@@ -1,0 +1,10 @@
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+*.sqlite3*
+.env
+.coverage
+*.egg-info/
+/rag/build/
+/rag/dist/

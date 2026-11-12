@@ -2,7 +2,6 @@
 
 import re
 
-# Multiword names are one search concept; the same normalization runs at ingestion.
 _PHRASES = (
     (r"\b(?:перв\w* недел\w*|недел\w* 1)\b", "week1 неделя"),
     (r"\b(?:втор\w* недел\w*|недел\w* 2)\b", "week2 неделя"),
