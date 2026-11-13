@@ -1,0 +1,244 @@
+openapi: 3.0.3
+info:
+  title: AI-buddy backend core
+  version: 0.1.0
+  description: Synthetic local prototype. Frontend and RAG are not connected.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /healthz:
+    get:
+      operationId: health
+      security: []
+      responses:
+        '200': {description: Process is alive}
+  /readyz:
+    get:
+      operationId: readiness
+      security: []
+      responses:
+        '200': {description: Database reachable}
+        '503': {description: Database unavailable}
+  /api/me:
+    get:
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Server-resolved identity
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, team]
+                properties:
+                  id: {type: string}
+                  team: {type: string}
+        '401': {$ref: '#/components/responses/Error'}
+  /api/access-requests:
+    get:
+      operationId: listAccessRequests
+      responses:
+        '200':
+          description: Current user's requests; no pagination in v0.1
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/AccessRequest'}
+        '401': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+    post:
+      operationId: proposeAccessRequest
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 128}
+          description: Scoped to current user. Reusing with a different payload returns 409. Limits are UTF-8 bytes in this implementation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Proposal'}
+      responses:
+        '201':
+          description: Persisted proposal, including an identical idempotent replay
+          headers:
+            Location:
+              schema: {type: string}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AccessRequest'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+  /api/access-requests/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/RequestID'}
+    get:
+      operationId: getAccessRequest
+      description: Reads persisted state only; foreign IDs return 404.
+      responses:
+        '200': {$ref: '#/components/responses/Request'}
+        '202': {$ref: '#/components/responses/InProgress'}
+        '401': {$ref: '#/components/responses/Error'}
+        '404': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+  /api/access-requests/{id}/confirm:
+    parameters:
+      - {$ref: '#/components/parameters/RequestID'}
+    post:
+      operationId: confirmAccessRequest
+      description: Confirms immutable saved parameters. First confirmation requires current version. Replays return current state without a new send.
+      requestBody: {$ref: '#/components/requestBodies/Version'}
+      responses:
+        '200': {$ref: '#/components/responses/Request'}
+        '202': {$ref: '#/components/responses/InProgress'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '403': {$ref: '#/components/responses/Error'}
+        '404': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
+  /api/access-requests/{id}/cancel:
+    parameters:
+      - {$ref: '#/components/parameters/RequestID'}
+    post:
+      operationId: cancelAccessRequest
+      description: Only proposed requests can be cancelled. Repeated cancellation is idempotent.
+      requestBody: {$ref: '#/components/requestBodies/Version'}
+      responses:
+        '200': {$ref: '#/components/responses/Request'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '404': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+  /api/access-requests/{id}/refresh:
+    parameters:
+      - {$ref: '#/components/parameters/RequestID'}
+    post:
+      operationId: refreshAccessRequest
+      description: Looks up external result. If a confirmed submission has no ticket, rechecks permissions and retries the same operation with the same idempotency key. No request body.
+      responses:
+        '200': {$ref: '#/components/responses/Request'}
+        '202': {$ref: '#/components/responses/InProgress'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '403': {$ref: '#/components/responses/Error'}
+        '404': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
+  /api/onboarding:
+    get:
+      operationId: getAccessProgress
+      description: Progress projection per access request; not a full onboarding plan.
+      responses:
+        '200':
+          description: Current user's progress
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [request_id, resource, state, next_step]
+                      properties:
+                        request_id: {type: string}
+                        resource: {type: string}
+                        state: {type: string, enum: [todo, waiting, blocked, done]}
+                        next_step:
+                          type: string
+                          enum: [confirm_proposal, refresh_request, wait_for_approval, start_local_setup, contact_mentor, create_new_proposal]
+        '401': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Local demo tokens only, demo-alex and demo-sam.
+  parameters:
+    RequestID:
+      name: id
+      in: path
+      required: true
+      schema: {type: string}
+  requestBodies:
+    Version:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [version]
+            properties:
+              version: {type: integer, format: int64, minimum: 1}
+  responses:
+    Request:
+      description: Current persisted request
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/AccessRequest'}
+    InProgress:
+      description: Submission is running or its result is unknown; use refresh to reconcile.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/AccessRequest'}
+    Error:
+      description: Structured error
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: object
+                required: [code]
+                properties:
+                  code:
+                    type: string
+                    enum: [invalid_input, unauthorized, forbidden, not_found, conflict, temporarily_unavailable, internal_error]
+  schemas:
+    Proposal:
+      type: object
+      additionalProperties: false
+      required: [resource, access, reason]
+      properties:
+        resource: {type: string, minLength: 1, maxLength: 128, description: Limit measured in UTF-8 bytes.}
+        access: {type: string, enum: [read, write], description: Demo policy permits read only.}
+        reason: {type: string, minLength: 1, maxLength: 1000, description: Nonblank; limit measured in UTF-8 bytes.}
+    AccessRequest:
+      type: object
+      required: [id, resource, access, reason, state, version, created_at, updated_at]
+      properties:
+        id: {type: string}
+        resource: {type: string}
+        access: {type: string, enum: [read, write]}
+        reason: {type: string}
+        state: {type: string, enum: [proposed, submitting, submitted, unknown, cancelled]}
+        version: {type: integer, format: int64, minimum: 1}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        ticket:
+          type: object
+          required: [id, status]
+          properties:
+            id: {type: string}
+            status: {type: string, enum: [pending, granted, rejected]}
