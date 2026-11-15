@@ -5,7 +5,7 @@
 | Каталог | Назначение |
 |---|---|
 | [backend/](backend/) | Каталог для Go API приложения |
-| [frontend/](frontend/) | Стартовая веб-страница |
+| [frontend/](frontend/README.md) | React + TypeScript: помощник, источники, заявки и следующие шаги |
 | [gateway/](gateway/) | Caddy раздаёт содержимое `frontend/` |
 | [rag/](rag/README.md) | Python-пакет, поиск по базе знаний, работа с моделью и CLI |
 | [contracts/](contracts/README.md) | Формат ответа RAG и граница ответственности при интеграции |
@@ -21,6 +21,7 @@ Go REST → Python gRPC и внутренний Python REST: [запуск API](
 docker compose -f docker-compose.dev.yaml up --build -d
 ```
 
+Gateway Caddy обслуживает статическую сборку и проксирует REST в существующий Go API. Сборка frontend выполняется отдельной завершающейся задачей, дополнительного HTTP-сервера нет. [Запуск, тестовые профили и проверка сценария](frontend/README.md).
 После запуска откройте [localhost](http://localhost/). API доступен на
 [`localhost:8080`](http://localhost:8080), а RAG индексируется автоматически
 перед запуском сервера.
@@ -59,11 +60,11 @@ python3 -m rag access --confirm
 Для запуска через Docker Compose выполните команды ниже. Именованный том сохраняет индекс и заявки между вызовами.
 
 ```sh
-docker compose -f docker-compose.dev.yaml --profile rag build rag
-docker compose -f docker-compose.dev.yaml run --rm rag index
-docker compose -f docker-compose.dev.yaml run --rm rag ask 'Не открывается Jira, ошибка 403' --offline
-docker compose -f docker-compose.dev.yaml run --rm rag access
-docker compose -f docker-compose.dev.yaml run --rm rag access --confirm
+docker compose -f docker-compose.dev.yaml --profile rag build rag-cli
+docker compose -f docker-compose.dev.yaml run --rm rag-cli index
+docker compose -f docker-compose.dev.yaml run --rm rag-cli ask 'Не открывается Jira, ошибка 403' --offline
+docker compose -f docker-compose.dev.yaml run --rm rag-cli access
+docker compose -f docker-compose.dev.yaml run --rm rag-cli access --confirm
 ```
 
 Настройки LLM, тестовые профили, поддержку PDF, команды тестирования и получения отчёта покрытия см. в [руководстве RAG](rag/README.md). Источники учебного корпуса и их области видимости перечислены в [манифесте](rag/knowledge/manifest.json).

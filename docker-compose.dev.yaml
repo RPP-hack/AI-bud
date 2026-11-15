@@ -65,15 +65,44 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
+   
+  frontend-build:
+    image: node:22-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run build"]
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+  
   rpp-buddy-gateway:
     image: caddy:latest
     ports:
       - "80:80"
+    environment:
+      API_UPSTREAM: api:8080
     volumes:
-      - ./gateway:/etc/caddy
-      - ./frontend:/var/www/html
+      - ./gateway:/etc/caddy:ro
+      - ./frontend:/var/www/html:ro
+    depends_on:
+      frontend-build:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+  # Preserve the standalone CLI demo without colliding with the API's rag server.
+  rag-cli:
+    profiles: ["rag"]
+    build:
+      context: ./rag
+      target: demo
+    environment:
+      RAG_LLM_API_KEY: "${RAG_LLM_API_KEY:-}"
+      RAG_LLM_BASE_URL: "${RAG_LLM_BASE_URL:-https://openrouter.ai/api/v1}"
+      RAG_LLM_MODEL: "${RAG_LLM_MODEL:-openai/gpt-4o-mini}"
+    volumes:
+      - rag-cli-data:/data
 
 volumes:
+  frontend-node-modules:
+  rag-cli-data:
   buddy-db:
   rag-data:
