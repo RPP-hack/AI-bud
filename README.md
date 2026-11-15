@@ -13,15 +13,33 @@
 
 Go REST → Python gRPC и внутренний Python REST: [запуск API](docs/rag-api.md).
 
-## Веб-интерфейс
+## Запуск всего проекта
 
-Выполните команду из корня репозитория и откройте [localhost](http://localhost/).
+Запустите весь проект из корня репозитория:
 
 ```sh
 docker compose -f docker-compose.dev.yaml up --build -d
 ```
 
 Gateway Caddy обслуживает статическую сборку и проксирует REST в существующий Go API. Сборка frontend выполняется отдельной завершающейся задачей, дополнительного HTTP-сервера нет. [Запуск, тестовые профили и проверка сценария](frontend/README.md).
+После запуска откройте [localhost](http://localhost/). API доступен на
+[`localhost:8080`](http://localhost:8080), а RAG индексируется автоматически
+перед запуском сервера.
+
+Переменные контейнеров передаются через
+[`backend/.env.compose.example`](backend/.env.compose.example) и
+[`rag/.env.compose.example`](rag/.env.compose.example) с помощью `env_file` в
+[`docker-compose.dev.yaml`](docker-compose.dev.yaml).
+Внутри Compose используются имена сервисов `db`, `mock-access` и `rag`, а не
+`localhost`.
+
+Остановка:
+
+```sh
+docker compose -f docker-compose.dev.yaml down
+```
+
+## Стартовая веб-страница
 
 ## Сценарий стажёра
 
