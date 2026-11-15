@@ -1,24 +1,79 @@
 name: rpp-buddy
+
 services:
+  db:
+    image: postgres:17.6-alpine
+    env_file:
+      - ./backend/.env.compose.example
+    volumes:
+      - buddy-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  mock-access:
+    build:
+      context: ./backend/services/api
+    entrypoint: ["mock-access"]
+    env_file:
+      - ./backend/.env.compose.example
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./backend/services/api
+    env_file:
+      - ./backend/.env.compose.example
+    depends_on:
+      db:
+        condition: service_healthy
+      mock-access:
+        condition: service_started
+      rag:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  rag-index:
+    build:
+      context: ./rag
+      target: server
+    entrypoint: ["python", "-m", "rag"]
+    command: ["index"]
+    env_file:
+      - ./rag/.env.compose.example
+    volumes:
+      - rag-data:/data
+
+  rag:
+    build:
+      context: ./rag
+      target: server
+    env_file:
+      - ./rag/.env.compose.example
+    volumes:
+      - rag-data:/data:ro
+    depends_on:
+      rag-index:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8001/ready', timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   rpp-buddy-gateway:
     image: caddy:latest
-    container_name: rpp-buddy-gateway
     ports:
       - "80:80"
     volumes:
       - ./gateway:/etc/caddy
       - ./frontend:/var/www/html
-  rag:
-    profiles: ["rag"]
-    build:
-      context: ./rag
-      target: demo
-    environment:
-      RAG_LLM_API_KEY: "${RAG_LLM_API_KEY:-}"
-      RAG_LLM_BASE_URL: "${RAG_LLM_BASE_URL:-https://openrouter.ai/api/v1}"
-      RAG_LLM_MODEL: "${RAG_LLM_MODEL:-openai/gpt-4o-mini}"
-    volumes:
-      - rag-data:/data
 
 volumes:
+  buddy-db:
   rag-data:
