@@ -8,8 +8,8 @@ from .retrieval import Retriever
 from .terms import search_terms
 
 
-def ask(question, *, audience, store=None, generator=None, offline=False, top_k=3):
-    passages = Retriever(store).retrieve(question, audience=audience, top_k=top_k)
+def ask(question, *, audience, store=None, generator=None, offline=False, top_k=3, as_of=None):
+    passages = Retriever(store).retrieve(question, audience=audience, top_k=top_k, as_of=as_of)
     result = (generator or Generator()).generate(question, passages, audience=audience, offline=offline)
     if (audience == PROFILES["intern-platform"] and result.status in ("answered", "sources_found")
             and {"jira", "403", "bud", "доступ"} & set(search_terms(question))

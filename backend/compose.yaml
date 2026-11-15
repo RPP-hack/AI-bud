@@ -35,6 +35,8 @@ services:
       MOCK_URL: http://mock-access:8090
       MOCK_TOKEN: local-mock-token
       RECONCILE_ENABLED: "true"
+      RAG_GRPC_TARGET: rag:50051
+      RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-local-rag-token}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -42,5 +44,40 @@ services:
         condition: service_healthy
       mock-access:
         condition: service_started
+      rag:
+        condition: service_healthy
+  rag-index:
+    build:
+      context: ../rag
+      target: server
+    entrypoint: ["python", "-m", "rag"]
+    command: ["index"]
+    volumes:
+      - rag-data:/data
+  rag:
+    build:
+      context: ../rag
+      target: server
+    environment:
+      RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-local-rag-token}
+      RAG_HTTP_HOST: 0.0.0.0
+      RAG_GRPC_ADDR: 0.0.0.0:50051
+      RAG_LLM_API_KEY: ${RAG_LLM_API_KEY:-}
+      RAG_LLM_BASE_URL: ${RAG_LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      RAG_LLM_MODEL: ${RAG_LLM_MODEL:-openai/gpt-4o-mini}
+    ports:
+      - "127.0.0.1:8001:8001"
+      - "127.0.0.1:50051:50051"
+    volumes:
+      - rag-data:/data:ro
+    depends_on:
+      rag-index:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8001/ready', timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 volumes:
   buddy-db:
+  rag-data:
