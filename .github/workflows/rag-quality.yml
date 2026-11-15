@@ -1,0 +1,32 @@
+name: RAG quality
+
+on:
+  pull_request:
+    paths: ['rag/**', 'contracts/**', 'docs/rag-*.md', '.github/workflows/rag-quality.yml']
+  push:
+    paths: ['rag/**', 'contracts/**', 'docs/rag-*.md', '.github/workflows/rag-quality.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e './rag[server,dev]'
+      - name: Pipeline, guardrail, evaluator and REST/gRPC tests
+        run: python -m unittest discover -s rag/tests -v
+      - name: Offline evaluation gates
+        if: always()
+        run: python -m rag.evaluation run --output rag/evals/reports/offline.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rag-evaluation
+          path: rag/evals/reports/offline.json
+          if-no-files-found: ignore

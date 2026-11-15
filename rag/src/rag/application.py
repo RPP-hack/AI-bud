@@ -10,10 +10,11 @@ import threading
 import time
 import uuid
 
-from .generation import GenerationConfig, GenerationError, Generator
+from .generation import GenerationConfig, GenerationError, Generator, GuardrailError
 from .pipeline import ask
 from .retrieval import Retriever
 from .storage import Audience, SQLiteStore
+from .guardrails import validate_question
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +67,11 @@ class RagApplication:
 
     @staticmethod
     def _validate(text, actor, top_k, request_id):
-        if (not isinstance(text, str) or not text.strip() or len(text) > 4000
-                or "\x00" in text or any(0xD800 <= ord(c) <= 0xDFFF for c in text)
-                or type(top_k) is not int or not 1 <= top_k <= 50):
+        try:
+            validate_question(text)
+        except ValueError:
+            raise ApplicationError("invalid_input") from None
+        if type(top_k) is not int or not 1 <= top_k <= 50:
             raise ApplicationError("invalid_input")
         if not isinstance(actor, Actor) or any(
             not isinstance(v, str) or not v.strip() or len(v) > 128
@@ -96,6 +99,11 @@ class RagApplication:
             yield lambda: max(0, deadline - time.monotonic())
             if time.monotonic() >= deadline:
                 raise ApplicationError("deadline_exceeded")
+        except GuardrailError as exc:
+            logger.warning("RAG output rejected (%s)", exc.code)
+            if time.monotonic() >= deadline:
+                raise ApplicationError("deadline_exceeded") from None
+            raise ApplicationError("temporarily_unavailable") from None
         except (sqlite3.Error, OSError, GenerationError):
             if time.monotonic() >= deadline:
                 raise ApplicationError("deadline_exceeded") from None
