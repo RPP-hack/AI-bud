@@ -10,9 +10,11 @@ requires-python = ">=3.11"
 
 [project.optional-dependencies]
 pdf = ["pypdf==6.21.4", "pypdfium2==5.13.0", "Pillow==13.0.0"]
+server = ["fastapi==0.163.0", "pydantic==2.14.3", "uvicorn==0.54.0", "grpcio==1.85.1", "grpcio-health-checking==1.85.1", "protobuf==7.36.2"]
+dev = ["grpcio-tools==1.85.1", "httpx==0.28.1"]
 
 [tool.setuptools]
-packages = ["rag", "rag.ingestion", "rag.knowledge"]
+packages = ["rag", "rag.ingestion", "rag.knowledge", "rag.transport", "rag.v1"]
 package-dir = {"" = "src", "rag.knowledge" = "knowledge"}
 
 [tool.setuptools.package-data]

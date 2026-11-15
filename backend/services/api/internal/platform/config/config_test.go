@@ -56,3 +56,16 @@ func TestReconciliationConfiguration(t *testing.T) {
 		t.Fatal(c, err)
 	}
 }
+
+func TestRAGRequiresServiceCredential(t *testing.T) {
+	values := map[string]string{"DEMO_MODE": "true", "DATABASE_URL": "postgres://localhost/buddy", "MOCK_TOKEN": "test", "RAG_GRPC_TARGET": "127.0.0.1:50051"}
+	get := func(key string) string { return values[key] }
+	if _, err := Load(get); err == nil {
+		t.Fatal("RAG enabled without a service credential")
+	}
+	values["RAG_SERVICE_TOKEN"] = "test-token"
+	c, err := Load(get)
+	if err != nil || c.RAGTarget != values["RAG_GRPC_TARGET"] || c.RAGToken != "test-token" {
+		t.Fatal(c, err)
+	}
+}

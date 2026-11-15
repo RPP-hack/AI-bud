@@ -7,6 +7,7 @@ import (
 	"ai-bud/services/api/internal/identity"
 	identitydemo "ai-bud/services/api/internal/identity/demo"
 	"ai-bud/services/api/internal/onboarding"
+	"ai-bud/services/api/internal/ragclient"
 	"context"
 	"encoding/json"
 	"errors"
@@ -30,6 +31,12 @@ func (DemoAuth) Authenticate(r *http.Request) (identity.Actor, bool) {
 		id = "alex"
 	case "Bearer demo-sam":
 		id = "sam"
+	case "Bearer demo-intern-platform":
+		id = "intern-platform"
+	case "Bearer demo-intern-search":
+		id = "intern-search"
+	case "Bearer demo-mentor-platform":
+		id = "mentor-platform"
 	default:
 		return identity.Actor{}, false
 	}
@@ -41,14 +48,18 @@ type actorKey struct{}
 type Handler struct {
 	service *application.Service
 	logger  *slog.Logger
+	rag     ragclient.Gateway
 }
 
-func New(service *application.Service, auth Authenticator, ping func(context.Context) error, logger *slog.Logger) http.Handler {
-	h := &Handler{service, logger}
+func New(service *application.Service, auth Authenticator, ping func(context.Context) error, logger *slog.Logger, options ...func(*Handler)) http.Handler {
+	h := &Handler{service: service, logger: logger}
+	for _, option := range options {
+		option(h)
+	}
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
 		a := actor(r)
-		write(w, 200, map[string]string{"id": a.ID, "team": a.Team})
+		write(w, 200, map[string]string{"id": a.ID, "team": a.Team, "role": a.Role})
 	})
 	api.HandleFunc("POST /api/access-requests", h.propose)
 	api.HandleFunc("GET /api/access-requests", h.list)
@@ -57,6 +68,8 @@ func New(service *application.Service, auth Authenticator, ping func(context.Con
 	api.HandleFunc("POST /api/access-requests/{id}/cancel", h.cancel)
 	api.HandleFunc("POST /api/access-requests/{id}/refresh", h.refresh)
 	api.HandleFunc("GET /api/onboarding", h.progress)
+	api.HandleFunc("POST /api/rag/answers", h.answer)
+	api.HandleFunc("POST /api/rag/search", h.search)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { write(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +87,11 @@ func New(service *application.Service, auth Authenticator, ping func(context.Con
 			writeError(w, 401, "unauthorized")
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.WithValue(r.Context(), actorKey{}, a), 10*time.Second)
+		timeout := 10 * time.Second
+		if r.URL.Path == "/api/rag/answers" || r.URL.Path == "/api/rag/search" {
+			timeout = ragclient.Timeout + 5*time.Second
+		}
+		ctx, cancel := context.WithTimeout(context.WithValue(r.Context(), actorKey{}, a), timeout)
 		defer cancel()
 		w.Header().Set("Cache-Control", "no-store")
 		api.ServeHTTP(w, r.WithContext(ctx))
@@ -111,10 +128,13 @@ func view(r domain.Request) requestView {
 	return v
 }
 func read(w http.ResponseWriter, r *http.Request, dst any) error {
+	return readLimit(w, r, dst, 8192)
+}
+func readLimit(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
 	if strings.Split(r.Header.Get("Content-Type"), ";")[0] != "application/json" {
 		return domain.ErrInvalid
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 8192)
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {

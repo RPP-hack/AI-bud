@@ -8,5 +8,5 @@ import (
 type Policy struct{}
 
 func (Policy) CanRequest(a identity.Actor, p domain.Parameters) bool {
-	return a.ID != "" && p.Access == "read" && ((a.Team == "notifications" && p.Resource == "notifications") || (a.Team == "payments" && p.Resource == "payments"))
+	return a.ID != "" && p.Access == "read" && ((a.Team == "notifications" && p.Resource == "notifications") || (a.Team == "payments" && p.Resource == "payments") || (a.Team == "platform" && a.Role == "intern" && p.Resource == "jira:BUD"))
 }

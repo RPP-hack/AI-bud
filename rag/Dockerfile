@@ -15,3 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr t
 
 FROM base AS demo
 RUN python -m pip install --no-cache-dir .
+
+FROM base AS server
+RUN python -m pip install --no-cache-dir '.[server]'
+ENTRYPOINT ["python", "-m", "rag.transport.server"]
+CMD []
+
+# Preserve the existing CLI as the default build target.
+FROM demo AS default
