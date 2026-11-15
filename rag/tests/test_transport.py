@@ -74,11 +74,11 @@ class TransportTests(unittest.TestCase):
 
     def test_health_and_missing_index(self):
         health = health_pb2_grpc.HealthStub(self.channel)
-        self.assertEqual(self.rest.get("/healthz").status_code, 200)
-        self.assertEqual(self.rest.get("/readyz").status_code, 200)
+        self.assertEqual(self.rest.get("/health").status_code, 200)
+        self.assertEqual(self.rest.get("/ready").status_code, 200)
         self.assertEqual(health.Check(health_pb2.HealthCheckRequest(), timeout=2).status, health_pb2.HealthCheckResponse.SERVING)
         self.store.path.unlink()
-        self.assertEqual(self.rest.get("/readyz").status_code, 503)
+        self.assertEqual(self.rest.get("/ready").status_code, 503)
         self.assertEqual(health.Check(health_pb2.HealthCheckRequest(), timeout=2).status, health_pb2.HealthCheckResponse.NOT_SERVING)
         response = self.rest.post("/v1/answers", json=dict(question="Jira 403", actor=self.actor), headers=self.headers)
         self.assertEqual(response.status_code, 503)

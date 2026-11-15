@@ -71,8 +71,8 @@ func New(service *application.Service, auth Authenticator, ping func(context.Con
 	api.HandleFunc("POST /api/rag/answers", h.answer)
 	api.HandleFunc("POST /api/rag/search", h.search)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { write(w, 200, map[string]string{"status": "ok"}) })
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { write(w, 200, map[string]string{"status": "ok"}) })
+	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 		if ping(ctx) != nil {

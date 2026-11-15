@@ -16,7 +16,7 @@ REST-сценарии и запуск описаны в [RAG API](../docs/rag-ap
 cd backend
 docker compose up --build -d
 docker compose ps
-curl http://localhost:8080/readyz
+curl http://localhost:8080/ready
 ```
 
 Compose поднимает PostgreSQL, API на `localhost:8080` и внутреннюю имитацию сервиса

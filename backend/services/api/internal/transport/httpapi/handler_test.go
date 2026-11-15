@@ -40,7 +40,7 @@ func call(h http.Handler, method, path, body, token string) *httptest.ResponseRe
 func TestHTTPWorkflow(t *testing.T) {
 	svc := application.New(memory.New(), &gateway{}, demo.Policy{})
 	h := New(svc, DemoAuth{}, func(context.Context) error { return nil }, slog.Default())
-	for _, path := range []string{"/healthz", "/readyz", "/api/me", "/api/onboarding", "/api/access-requests"} {
+	for _, path := range []string{"/health", "/ready", "/api/me", "/api/onboarding", "/api/access-requests"} {
 		if w := call(h, "GET", path, "", "demo-alex"); w.Code != 200 {
 			t.Fatal(path, w.Code)
 		}
@@ -83,7 +83,7 @@ func TestHTTPValidationAndCancellation(t *testing.T) {
 		method, path, body, token string
 		want                      int
 	}{
-		{"GET", "/readyz", "", "", 503}, {"GET", "/api/me", "", "", 401},
+		{"GET", "/ready", "", "", 503}, {"GET", "/api/me", "", "", 401},
 		{"POST", "/api/access-requests", `{"resource":"payments","access":"read","reason":"task"}`, "demo-alex", 403},
 		{"POST", "/api/access-requests", `{"resource":"notifications","access":"write","reason":"task"}`, "demo-alex", 403},
 		{"POST", "/api/access-requests", `{"user_id":"sam"}`, "demo-alex", 400},

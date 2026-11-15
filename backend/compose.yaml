@@ -74,7 +74,7 @@ services:
       rag-index:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8001/readyz', timeout=2).close()"]
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8001/ready', timeout=2).close()"]
       interval: 5s
       timeout: 3s
       retries: 10

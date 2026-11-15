@@ -118,6 +118,7 @@ def create_app(application=None, token=None, *, lifespan=None):
     service = application if application is not None else RagApplication()
     token = service_token(token)
     app = FastAPI(title="AI-bud internal RAG API", version="1.0.0", lifespan=lifespan,
+                  docs_url=None, redoc_url=None,
                   responses={"default": {"model": ErrorOutput,
                              "description": "Structured error: 400 invalid input, 401 unauthorized, 429 capacity, 503 unavailable, 504 deadline, or 500 internal error."}})
     app.add_middleware(BodyLimit)
@@ -144,11 +145,11 @@ def create_app(application=None, token=None, *, lifespan=None):
         response.headers["Cache-Control"] = "no-store"
         return response
 
-    @app.get("/healthz")
+    @app.get("/health")
     def health():
         return {"status": "ok"}
 
-    @app.get("/readyz")
+    @app.get("/ready")
     def ready():
         if not service.ready():
             return error_response("temporarily_unavailable")

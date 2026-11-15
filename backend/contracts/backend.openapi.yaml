@@ -8,13 +8,13 @@ servers:
 security:
   - bearerAuth: []
 paths:
-  /healthz:
+  /health:
     get:
       operationId: health
       security: []
       responses:
         '200': {description: Process is alive}
-  /readyz:
+  /ready:
     get:
       operationId: readiness
       security: []

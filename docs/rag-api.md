@@ -11,8 +11,8 @@ From the repository root:
 
 ```sh
 docker compose -f backend/compose.yaml up --build -d
-curl http://localhost:8001/readyz
-curl http://localhost:8080/readyz
+curl http://localhost:8001/ready
+curl http://localhost:8080/ready
 curl -sS http://localhost:8080/api/rag/answers \
   -H 'Authorization: Bearer demo-intern-platform' \
   -H 'Content-Type: application/json' \
@@ -59,7 +59,7 @@ python -m rag.transport.server
 This starts REST at `127.0.0.1:8001` and gRPC at `127.0.0.1:50051`. Configure
 `RAG_DB_PATH`, `RAG_HTTP_HOST`, `RAG_HTTP_PORT`, and `RAG_GRPC_ADDR` as needed.
 To start REST alone: `uvicorn rag.transport.rest:create_app --factory --port 8001`.
-Interactive REST documentation is at `http://localhost:8001/docs`.
+The REST OpenAPI schema is available at `http://localhost:8001/openapi.json`.
 
 ```sh
 curl -sS http://localhost:8001/v1/answers \
@@ -107,7 +107,7 @@ execution: `llm`, `offline`, or `rules`.
 | internal_error | 500 | INTERNAL | 500 |
 
 Errors use `{"error":{"code":"..."}}`. Go returns 401 for invalid employee auth.
-`/healthz` checks the Python process, `/readyz` checks the readable populated index.
+`/health` checks the Python process, `/ready` checks the readable populated index.
 The standard gRPC health `Check` supports the empty service and
 `aibud.rag.v1.RagService`; `Watch` is not implemented. Readiness does not make a paid
 LLM call. Go's existing readiness endpoint continues to check its database.
