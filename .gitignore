@@ -1,6 +1,15 @@
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+*.sqlite3*
 ../.idea/
 .DS_Store
 .env
 coverage.out
 coverage.html
 bin/
+*.egg-info/
+/rag/build/
+/rag/dist/
+.idea

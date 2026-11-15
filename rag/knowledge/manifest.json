@@ -1,0 +1,155 @@
+[
+  {
+    "id": "checklist-week1",
+    "path": "checklist-week1.md",
+    "title": "Чек-лист Авито · Материалы для всех, неделя 1",
+    "source_type": "checklist",
+    "origin": "public",
+    "team": "*",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ],
+    "source_url": "https://docs.google.com/spreadsheets/d/1qKFqOzfSZ2jEz57jBSmq7rukDXi_tRfWohgemViceV0/edit#gid=1073060303"
+  },
+  {
+    "id": "backend-week1",
+    "path": "backend-week1.md",
+    "title": "Чек-лист Авито · Чек-лист Backend, недели 1–2",
+    "source_type": "checklist",
+    "origin": "public",
+    "team": "*",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ],
+    "source_url": "https://docs.google.com/spreadsheets/d/1qKFqOzfSZ2jEz57jBSmq7rukDXi_tRfWohgemViceV0/edit"
+  },
+  {
+    "id": "jira-access",
+    "path": "jira-access.md",
+    "title": "Доступ на чтение в Jira проекта BUD",
+    "source_type": "runbook",
+    "origin": "demo",
+    "team": "platform",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ],
+    "rule_key": "jira.bud.read",
+    "rule_value": "Подать заявку на чтение BUD"
+  },
+  {
+    "id": "first-pr",
+    "path": "first-pr.md",
+    "title": "Bitbucket · Репозиторий и первый pull request",
+    "source_type": "team_guide",
+    "origin": "demo",
+    "team": "platform",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ]
+  },
+  {
+    "id": "review-general",
+    "path": "review-general.md",
+    "title": "Кого позвать на ревью первого PR",
+    "source_type": "handbook",
+    "origin": "demo",
+    "team": "*",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ],
+    "rule_key": "pr.reviewer",
+    "rule_value": "Наставник"
+  },
+  {
+    "id": "review-platform",
+    "path": "review-platform.md",
+    "title": "Ревьюер первого PR в Platform",
+    "source_type": "team_guide",
+    "origin": "demo",
+    "team": "platform",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ],
+    "rule_key": "pr.reviewer",
+    "rule_value": "Дежурный разработчик"
+  },
+  {
+    "id": "mentor",
+    "path": "mentor.md",
+    "title": "Проверка плана наставником Platform",
+    "source_type": "team_guide",
+    "origin": "demo",
+    "team": "platform",
+    "roles": [
+      "mentor",
+      "lead"
+    ]
+  },
+  {
+    "id": "search-team",
+    "path": "search-team.md",
+    "title": "Репозиторий search-demo и первая сборка",
+    "source_type": "team_guide",
+    "origin": "demo",
+    "team": "search",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ]
+  },
+  {
+    "id": "dev-archive",
+    "path": "dev-archive.md",
+    "title": "Проверка фичи на dev-окружении",
+    "source_type": "runbook",
+    "origin": "demo",
+    "team": "platform",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ],
+    "review_by": "2025-01-01"
+  },
+  {
+    "id": "playbook",
+    "path": "playbook.md",
+    "title": "AvitoTech Playbook · Принципы разработки и обратная связь по коду",
+    "source_type": "handbook",
+    "origin": "public",
+    "team": "*",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ],
+    "source_url": "https://github.com/avito-tech/playbook/blob/master/development-principles.md"
+  },
+  {
+    "id": "checklist-week2",
+    "path": "checklist-week2.md",
+    "title": "Чек-лист Авито · Материалы для всех, неделя 2",
+    "source_type": "checklist",
+    "origin": "public",
+    "team": "*",
+    "roles": [
+      "intern",
+      "mentor",
+      "lead"
+    ],
+    "source_url": "https://docs.google.com/spreadsheets/d/1qKFqOzfSZ2jEz57jBSmq7rukDXi_tRfWohgemViceV0/edit#gid=1073060303"
+  }
+]
