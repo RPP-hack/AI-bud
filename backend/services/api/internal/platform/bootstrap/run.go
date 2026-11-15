@@ -20,6 +20,7 @@ type Application struct {
 	Address    string
 	Handler    http.Handler
 	Background func(context.Context)
+	Close      func() error
 }
 
 type Factory func(config.Config, *pgxpool.Pool, *slog.Logger) (Application, error)
@@ -49,7 +50,10 @@ func Run(factory Factory) error {
 	if err != nil {
 		return err
 	}
-	srv := &http.Server{Addr: app.Address, Handler: app.Handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second}
+	if app.Close != nil {
+		defer app.Close()
+	}
+	srv := &http.Server{Addr: app.Address, Handler: app.Handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second}
 	logger.Info("server starting", "address", app.Address, "demo_mode", true)
 	return Serve(ctx, srv, app.Background)
 }

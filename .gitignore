@@ -12,4 +12,5 @@ bin/
 *.egg-info/
 /rag/build/
 /rag/dist/
+/rag/evals/reports/
 .idea

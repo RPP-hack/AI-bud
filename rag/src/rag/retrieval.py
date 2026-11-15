@@ -6,6 +6,7 @@ import json
 
 from .storage import Audience, SQLiteStore
 from .terms import search_terms
+from .guardrails import validate_question
 
 
 @dataclass(frozen=True)
@@ -39,9 +40,8 @@ class Retriever:
     def __init__(self, store=None):
         self.store = store if store is not None else SQLiteStore()
 
-    def retrieve(self, query: str, *, audience: Audience, top_k=3) -> list[RetrievedChunk]:
-        if not isinstance(query, str) or not query.strip() or "\x00" in query or len(query) > 4000:
-            raise ValueError("Supply a question between 1 and 4000 characters")
+    def retrieve(self, query: str, *, audience: Audience, top_k=3, as_of=None) -> list[RetrievedChunk]:
+        validate_question(query)
         if type(top_k) is not int or not 1 <= top_k <= 50:
             raise ValueError("top_k must be between 1 and 50")
         if not isinstance(audience, Audience):
@@ -49,7 +49,9 @@ class Retriever:
         terms = list(dict.fromkeys(search_terms(query)))
         if not terms:
             return []
-        today = date.today()
+        today = date.today() if as_of is None else as_of
+        if type(today) is not date:
+            raise ValueError("as_of must be a date")
         results = []
         for row in self.store.search(terms, audience, top_k, today):
             values = dict(row)

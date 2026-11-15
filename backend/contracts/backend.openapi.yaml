@@ -2,19 +2,19 @@ openapi: 3.0.3
 info:
   title: AI-buddy backend core
   version: 0.1.0
-  description: Synthetic local prototype. Frontend and RAG are not connected.
+  description: Synthetic local prototype. Go calls Python RAG over gRPC; frontend is not connected.
 servers:
   - url: http://localhost:8080
 security:
   - bearerAuth: []
 paths:
-  /healthz:
+  /health:
     get:
       operationId: health
       security: []
       responses:
         '200': {description: Process is alive}
-  /readyz:
+  /ready:
     get:
       operationId: readiness
       security: []
@@ -35,6 +35,7 @@ paths:
                 properties:
                   id: {type: string}
                   team: {type: string}
+                  role: {type: string, enum: [intern, mentor, lead]}
         '401': {$ref: '#/components/responses/Error'}
   /api/access-requests:
     get:
@@ -139,6 +140,70 @@ paths:
         '409': {$ref: '#/components/responses/Error'}
         '500': {$ref: '#/components/responses/Error'}
         '503': {$ref: '#/components/responses/Error'}
+  /api/rag/answers:
+    post:
+      operationId: answerRAGQuestion
+      description: Authenticates the employee and delegates retrieval/generation to Python. Does not create access requests.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [question]
+              properties:
+                question: {type: string, minLength: 1, maxLength: 4000}
+                mode: {type: string, enum: [offline, llm], default: offline}
+                top_k: {type: integer, minimum: 1, maximum: 50, default: 3}
+      responses:
+        '200':
+          description: Validated answer or a business outcome such as insufficient evidence.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RAGAnswer'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '408': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
+        '504': {$ref: '#/components/responses/Error'}
+  /api/rag/search:
+    post:
+      operationId: searchRAGEvidence
+      description: Returns only evidence permitted for the authenticated employee. Conflict expansion can exceed top_k.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [query]
+              properties:
+                query: {type: string, minLength: 1, maxLength: 4000}
+                top_k: {type: integer, minimum: 1, maximum: 50, default: 3}
+      responses:
+        '200':
+          description: Authorized passages; an empty array means no evidence was found.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [request_id, sources]
+                properties:
+                  request_id: {type: string}
+                  sources:
+                    type: array
+                    items: {$ref: '#/components/schemas/RAGSource'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '408': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+        '500': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
+        '504': {$ref: '#/components/responses/Error'}
   /api/onboarding:
     get:
       operationId: getAccessProgress
@@ -171,7 +236,7 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      description: Local demo tokens only, demo-alex and demo-sam.
+      description: Local demo tokens only; demo-alex, demo-sam, demo-intern-platform, demo-intern-search, demo-mentor-platform.
   parameters:
     RequestID:
       name: id
@@ -214,8 +279,47 @@ components:
                 properties:
                   code:
                     type: string
-                    enum: [invalid_input, unauthorized, forbidden, not_found, conflict, temporarily_unavailable, internal_error]
+                    enum: [invalid_input, unauthorized, forbidden, not_found, conflict, temporarily_unavailable, internal_error, resource_exhausted, deadline_exceeded, request_cancelled]
   schemas:
+    RAGSource:
+      type: object
+      required: [document_id, version_id, chunk_id, title, text, source_url, page_number, origin, stale, review_by, start_char, end_char]
+      properties:
+        document_id: {type: string}
+        version_id: {type: string}
+        chunk_id: {type: string}
+        title: {type: string}
+        text: {type: string}
+        source_url: {type: string, nullable: true}
+        page_number: {type: integer, nullable: true}
+        origin: {type: string, enum: [demo, public]}
+        stale: {type: boolean}
+        review_by: {type: string, nullable: true}
+        start_char: {type: integer}
+        end_char: {type: integer}
+    RAGAnswer:
+      type: object
+      required: [request_id, status, mode, steps, sources, next_step, model, action]
+      properties:
+        request_id: {type: string}
+        status: {type: string, enum: [answered, sources_found, insufficient_evidence, conflict, needs_review]}
+        mode: {type: string, enum: [llm, offline, rules]}
+        steps:
+          type: array
+          items:
+            type: object
+            required: [text, source_ids]
+            properties:
+              text: {type: string}
+              source_ids:
+                type: array
+                items: {type: string}
+        sources:
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/RAGSource'}
+        next_step: {type: string}
+        model: {type: string, nullable: true}
+        action: {type: string, nullable: true}
     Proposal:
       type: object
       additionalProperties: false

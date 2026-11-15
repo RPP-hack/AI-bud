@@ -1,8 +1,10 @@
-.PHONY: test integration coverage vet fmt up down
+.PHONY: test integration rag-integration coverage vet fmt up down
 test:
 	cd services/api && go test -race ./...
 integration:
 	cd services/api && go test -race -count=1 -tags=integration ./...
+rag-integration:
+	cd services/api && go test -race -count=1 -tags=rag_integration ./internal/ragclient
 coverage:
 	cd services/api && go test -race -count=1 -tags=integration -coverpkg=./... -coverprofile=coverage.out ./...
 	cd services/api && go tool cover -func=coverage.out

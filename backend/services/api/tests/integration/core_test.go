@@ -275,7 +275,7 @@ func TestMockContractAndDurability(t *testing.T) {
 	for _, tc := range []struct {
 		method, path, body, token string
 		status                    int
-	}{{"GET", "/healthz", "", "", 200}, {"GET", "/tickets/operation", "", "bad", 401}, {"POST", "/tickets", "{", "token", 400}, {"POST", "/tickets", "{} {}", "token", 400}, {"POST", "/tickets", "{}", "token", 400}} {
+	}{{"GET", "/health", "", "", 200}, {"GET", "/tickets/operation", "", "bad", 401}, {"POST", "/tickets", "{", "token", 400}, {"POST", "/tickets", "{} {}", "token", 400}, {"POST", "/tickets", "{}", "token", 400}} {
 		code, _ := request(t, handler, tc.method, tc.path, tc.body, tc.token)
 		if code != tc.status {
 			t.Fatal(tc, code)

@@ -14,6 +14,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .retrieval import RetrievedChunk
+from .guardrails import (MAX_ANSWER_CHARS, MAX_STEPS, is_instruction_attack,
+                         output_violation, validate_question)
 
 
 DEFAULT_MODEL = "openai/gpt-4o-mini"
@@ -23,6 +25,12 @@ MAX_RESPONSE_BYTES = 1024 * 1024
 
 class GenerationError(RuntimeError):
     """A gateway failure or an answer that could not be validated."""
+
+
+class GuardrailError(GenerationError):
+    def __init__(self, code):
+        self.code = code
+        super().__init__("Model output rejected: " + code)
 
 
 @dataclass(frozen=True)
@@ -98,6 +106,9 @@ SYSTEM_PROMPT = """Ты AI-buddy стажёра. Ответь на языке в
 Учитывай команду и роль. Если данных недостаточно, верни insufficient_evidence.
 Если инструкции противоречат друг другу, верни conflict, изложи обе позиции со ссылками.
 Не выбирай победителя. Не утверждай, что действие выполнено, заявка отправлена или доступ выдан.
+Ты не вызываешь инструменты и не выполняешь действия. Не придумывай команды, адреса,
+номера заявок или недостающие шаги. Если источник только упоминает инструмент, это
+не инструкция по его установке. Не добавляй HTML, изображения или ссылки вне источников.
 Заполняй steps только проверяемыми утверждениями: каждому нужны source_ids из контекста.
 Верни JSON: {"status":"answered","steps":[{"text":"...","source_ids":["S1"]}]}.
 Допустимые статусы: answered, insufficient_evidence, conflict. Для answered нужен ответ,
@@ -165,17 +176,24 @@ class ChatCompletionsClient:
 def _parse_answer(response, sources, model):
     try:
         choice = response["choices"][0]
-        content = choice["message"]["content"]
+        message = choice["message"]
+        content = message["content"]
         finished = choice.get("finish_reason")
-    except (KeyError, IndexError, TypeError):
+    except (KeyError, IndexError, TypeError, AttributeError):
         raise GenerationError("LLM response has no assistant message") from None
-    if finished not in (None, "stop") or not isinstance(content, str):
+    if finished != "stop" or not isinstance(content, str):
         raise GenerationError("LLM returned an incomplete answer")
+    if message.get("tool_calls") or message.get("function_call") or message.get("refusal"):
+        raise GuardrailError("unexpected_model_action")
+    if len(content) > MAX_ANSWER_CHARS:
+        raise GuardrailError("output_limit")
     fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", content.strip(), re.DOTALL | re.IGNORECASE)
     data = _json_object(fenced.group(1) if fenced else content)
     if (set(data) != {"status", "steps"} or not isinstance(data["steps"], list)
             or data["status"] not in ("answered", "conflict", "insufficient_evidence")):
         raise GenerationError("Invalid AI-buddy response schema")
+    if len(data["steps"]) > MAX_STEPS:
+        raise GuardrailError("output_limit")
     claims, cited = [], set()
     for step in data["steps"]:
         if not isinstance(step, dict) or set(step) != {"text", "source_ids"}:
@@ -185,6 +203,9 @@ def _parse_answer(response, sources, model):
                 or not isinstance(refs, list) or not refs
                 or any(not isinstance(ref, str) or ref not in sources for ref in refs)):
             raise GenerationError("A step has empty text or invalid citations")
+        violation = output_violation(text, [sources[ref] for ref in refs])
+        if violation:
+            raise GuardrailError(violation)
         claims.append(GeneratedClaim(text.strip(), tuple(dict.fromkeys(refs))))
         cited.update(refs)
     status = data["status"]
@@ -209,14 +230,20 @@ class Generator:
 
     def generate(self, question, passages, *, audience, offline=False) -> GenerationResult:
         """Pass only the retriever's authorized results for the same request."""
-        if not isinstance(question, str) or not question.strip() or len(question) > 4000:
-            raise ValueError("Supply a question between 1 and 4000 characters")
+        validate_question(question)
+        if is_instruction_attack(question):
+            return GenerationResult("insufficient_evidence", "rules", next_step=ESCALATE)
         visible = {}
         for passage in passages:
             if not isinstance(passage, RetrievedChunk):
                 raise ValueError("Expected passages from retrieval")
             if passage.team not in ("*", audience.team) or audience.role not in passage.roles:
                 continue
+            if any(is_instruction_attack(text) for text in
+                   (passage.text, passage.title, passage.rule_value or "")):
+                # Do not silently discard one side of a conflict or quote the attack
+                # in offline mode. Escalate the whole answer without a provider call.
+                return GenerationResult("insufficient_evidence", "rules", next_step=ESCALATE)
             if visible.setdefault(passage.citation_id, passage) != passage:
                 raise ValueError("Conflicting metadata for the same citation")
         sources = {f"S{i}": p for i, p in enumerate(visible.values(), 1)}

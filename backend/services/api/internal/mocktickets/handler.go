@@ -23,11 +23,11 @@ type Handler struct {
 func New(pool *pgxpool.Pool, token string, grantAfter time.Duration) http.Handler {
 	h := &Handler{pool, token, grantAfter}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("POST /tickets", h.create)
 	mux.HandleFunc("GET /tickets/{id}", h.get)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/healthz" && (token == "" || r.Header.Get("Authorization") != "Bearer "+token) {
+		if r.URL.Path != "/health" && (token == "" || r.Header.Get("Authorization") != "Bearer "+token) {
 			http.Error(w, "unauthorized", 401)
 			return
 		}

@@ -11,6 +11,8 @@
 | [contracts/](contracts/README.md) | Формат ответа RAG и граница ответственности при интеграции |
 | [docs/](docs/rag-sdd.md) | Спецификация поведения и план проверки пользы |
 
+Go REST → Python gRPC и внутренний Python REST: [запуск API](docs/rag-api.md).
+
 ## Стартовая веб-страница
 
 Выполните команду из корня репозитория и откройте [localhost](http://localhost/).

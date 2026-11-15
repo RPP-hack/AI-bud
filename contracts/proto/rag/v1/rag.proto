@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package aibud.rag.v1;
+option go_package = "ai-bud/services/api/internal/ragclient/ragv1";
+
+service RagService {
+  rpc Answer(AnswerRequest) returns (AnswerResponse);
+  rpc Search(SearchRequest) returns (SearchResponse);
+}
+
+// Accepted only from an authenticated backend, never from browser input.
+message Actor {
+  string user_id = 1;
+  string role = 2;
+  string team = 3;
+}
+
+enum AnswerMode {
+  ANSWER_MODE_UNSPECIFIED = 0; // Defaults to offline.
+  ANSWER_MODE_LLM = 1;
+  ANSWER_MODE_OFFLINE = 2;
+}
+
+enum AnswerStatus {
+  ANSWER_STATUS_UNSPECIFIED = 0;
+  ANSWER_STATUS_ANSWERED = 1;
+  ANSWER_STATUS_SOURCES_FOUND = 2;
+  ANSWER_STATUS_INSUFFICIENT_EVIDENCE = 3;
+  ANSWER_STATUS_CONFLICT = 4;
+  ANSWER_STATUS_NEEDS_REVIEW = 5;
+}
+
+message AnswerRequest {
+  string request_id = 1; // Optional correlation ID; generated if empty.
+  string question = 2;
+  Actor actor = 3;
+  AnswerMode mode = 4;
+  optional uint32 top_k = 5; // Default 3, valid range 1–50.
+}
+
+message SearchRequest {
+  string request_id = 1;
+  string query = 2;
+  Actor actor = 3;
+  optional uint32 top_k = 4;
+}
+
+message Step {
+  string text = 1;
+  repeated string source_ids = 2;
+}
+
+message Source {
+  string document_id = 1;
+  string version_id = 2;
+  string chunk_id = 3;
+  string title = 4;
+  string text = 5;
+  optional string source_url = 6;
+  optional uint32 page_number = 7;
+  string origin = 8;
+  bool stale = 9;
+  optional string review_by = 10;
+  uint32 start_char = 11;
+  uint32 end_char = 12;
+}
+
+message AnswerResponse {
+  string request_id = 1;
+  AnswerStatus status = 2;
+  string mode = 3; // Actual execution: llm, offline, or rules.
+  repeated Step steps = 4;
+  map<string, Source> sources = 5;
+  string next_step = 6;
+  optional string model = 7;
+  optional string action = 8; // A preview suggestion, never an executed action.
+}
+
+message SearchResponse {
+  string request_id = 1;
+  repeated Source sources = 2;
+}

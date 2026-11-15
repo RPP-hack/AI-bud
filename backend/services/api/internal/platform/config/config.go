@@ -14,6 +14,7 @@ type Config struct {
 	GrantAfter                                          time.Duration
 	ReconcileEnabled                                    bool
 	Reconciliation                                      application.ReconciliationOptions
+	RAGTarget, RAGToken                                 string
 }
 
 func Load(get func(string) string) (Config, error) {
@@ -21,6 +22,10 @@ func Load(get func(string) string) (Config, error) {
 		return Config{}, fmt.Errorf("this build requires DEMO_MODE=true: corporate authentication is not connected")
 	}
 	c := Config{DatabaseURL: get("DATABASE_URL"), HTTPAddr: get("HTTP_ADDR"), MockAddr: get("MOCK_ADDR"), MockURL: get("MOCK_URL"), MockToken: get("MOCK_TOKEN")}
+	c.RAGTarget, c.RAGToken = get("RAG_GRPC_TARGET"), get("RAG_SERVICE_TOKEN")
+	if c.RAGTarget != "" && c.RAGToken == "" {
+		return Config{}, fmt.Errorf("RAG_SERVICE_TOKEN is required with RAG_GRPC_TARGET")
+	}
 	if c.DatabaseURL == "" || c.MockToken == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL and MOCK_TOKEN are required")
 	}
