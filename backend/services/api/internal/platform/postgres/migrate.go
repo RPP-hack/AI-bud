@@ -14,6 +14,9 @@ var schema string
 //go:embed reconciliation.sql
 var reconciliation string
 
+//go:embed conversations.sql
+var conversations string
+
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -26,7 +29,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err = tx.Exec(ctx, "CREATE TABLE IF NOT EXISTS schema_migrations (version integer PRIMARY KEY)"); err != nil {
 		return err
 	}
-	for index, sql := range []string{schema, reconciliation} {
+	for index, sql := range []string{schema, reconciliation, conversations} {
 		version := index + 1
 		var exists bool
 		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", version).Scan(&exists); err != nil {

@@ -30,12 +30,18 @@ enum AnswerStatus {
   ANSWER_STATUS_NEEDS_REVIEW = 5;
 }
 
+message ConversationMessage {
+  string role = 1;
+  string content = 2;
+}
+
 message AnswerRequest {
   string request_id = 1; // Optional correlation ID; generated if empty.
   string question = 2;
   Actor actor = 3;
   AnswerMode mode = 4;
   optional uint32 top_k = 5; // Default 3, valid range 1–50.
+  repeated ConversationMessage history = 6;
 }
 
 message SearchRequest {

@@ -40,7 +40,8 @@ class RagServicer(rag_pb2_grpc.RagServiceServicer):
                          pb.ANSWER_MODE_LLM: "llm"}
                 if request.mode not in modes:
                     raise ApplicationError("invalid_input")
-                result = self.application.answer(request.question, actor, mode=modes[request.mode], **kwargs)
+                history = [{"role": item.role, "content": item.content} for item in request.history]
+                result = self.application.answer(request.question, actor, mode=modes[request.mode], history=history, **kwargs)
                 response = answer_message(result)
             else:
                 result = self.application.search(request.query, actor, **kwargs)

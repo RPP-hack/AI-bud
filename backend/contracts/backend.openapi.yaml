@@ -2,12 +2,88 @@ openapi: 3.0.3
 info:
   title: AI-buddy backend core
   version: 0.1.0
-  description: Synthetic local prototype. Go calls Python RAG over gRPC; frontend is not connected.
+  description: Synthetic local prototype. Go calls Python RAG over gRPC; the frontend restores conversations from PostgreSQL.
 servers:
   - url: http://localhost:8080
 security:
   - bearerAuth: []
 paths:
+  /api/conversation:
+    get:
+      operationId: getActiveConversation
+      description: Returns or creates the authenticated user's active conversation. Pending turns interrupted for 60 seconds become failed; no generation is retried automatically.
+      responses:
+        '200':
+          description: Persisted conversation, at most 100 turns
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Conversation'}
+        '401': {$ref: '#/components/responses/Error'}
+        '503': {$ref: '#/components/responses/Error'}
+  /api/conversation/new:
+    post:
+      operationId: startNewConversation
+      description: Closes the specified active conversation and creates an empty one. Replays for an already closed owned conversation return the current one. Pending generation prevents reset.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [conversation_id]
+              properties:
+                conversation_id: {type: string, minLength: 1, maxLength: 128}
+      responses:
+        '200':
+          description: New or current active conversation
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Conversation'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '404': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+  /api/conversations/{id}/messages:
+    post:
+      operationId: sendConversationMessage
+      description: Persists the question before calling RAG. History is assembled on the server. Completed and failed turns are persisted; reconnect with GET /api/conversation. Explicit retry after a failed turn uses a new key; transport retries use the same key and payload.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [question]
+              properties:
+                question: {type: string, minLength: 1, maxLength: 4000}
+                mode: {type: string, enum: [offline, llm], default: offline}
+                top_k: {type: integer, minimum: 1, maximum: 50, default: 3}
+      responses:
+        '200':
+          description: Persisted completed or failed turn
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConversationTurn'}
+        '202':
+          description: Idempotent replay of a pending turn
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ConversationTurn'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '404': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
   /health:
     get:
       operationId: health
@@ -279,8 +355,30 @@ components:
                 properties:
                   code:
                     type: string
-                    enum: [invalid_input, unauthorized, forbidden, not_found, conflict, temporarily_unavailable, internal_error, resource_exhausted, deadline_exceeded, request_cancelled]
+                    enum: [invalid_input, unauthorized, forbidden, not_found, conflict, temporarily_unavailable, internal_error, resource_exhausted, deadline_exceeded, request_cancelled, conversation_full]
   schemas:
+    Conversation:
+      type: object
+      required: [id, turns]
+      properties:
+        id: {type: string}
+        turns:
+          type: array
+          maxItems: 100
+          items: {$ref: '#/components/schemas/ConversationTurn'}
+    ConversationTurn:
+      type: object
+      required: [id, client_id, question, mode, top_k, state, created_at]
+      properties:
+        id: {type: string}
+        client_id: {type: string, description: Client's idempotency key}
+        question: {type: string}
+        mode: {type: string, enum: [offline, llm]}
+        top_k: {type: integer}
+        state: {type: string, enum: [pending, completed, failed]}
+        answer: {$ref: '#/components/schemas/RAGAnswer'}
+        error_code: {type: string, enum: [temporarily_unavailable, deadline_exceeded, resource_exhausted, interrupted]}
+        created_at: {type: string, format: date-time}
     RAGSource:
       type: object
       required: [document_id, version_id, chunk_id, title, text, source_url, page_number, origin, stale, review_by, start_char, end_char]

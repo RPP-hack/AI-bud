@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"ai-bud/services/api/internal/conversation/domain"
+	"errors"
 	"net/http"
 
 	"ai-bud/services/api/internal/ragclient"
@@ -61,6 +63,10 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ragError(w http.ResponseWriter, err error) {
+	if errors.Is(err, domain.ErrInvalid) {
+		writeError(w, 400, "invalid_input")
+		return
+	}
 	switch status.Code(err) {
 	case codes.InvalidArgument:
 		writeError(w, 400, "invalid_input")

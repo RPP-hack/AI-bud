@@ -342,7 +342,7 @@ func TestMigrationBackfillsPendingOperations(t *testing.T) {
 	if err = pool.QueryRow(ctx, "SELECT count(*) FROM access_reconciliation_jobs").Scan(&count); err != nil || count != 3 {
 		t.Fatal(count, err)
 	}
-	if err = pool.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&count); err != nil || count != 2 {
+	if err = pool.QueryRow(ctx, "SELECT max(version) FROM schema_migrations").Scan(&count); err != nil || count != 3 {
 		t.Fatal(count, err)
 	}
 }

@@ -189,6 +189,58 @@ func (x *Actor) GetTeam() string {
 	return ""
 }
 
+type ConversationMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Role          string                 `protobuf:"bytes,1,opt,name=role,proto3" json:"role,omitempty"`
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ConversationMessage) Reset() {
+	*x = ConversationMessage{}
+	mi := &file_rag_v1_rag_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConversationMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConversationMessage) ProtoMessage() {}
+
+func (x *ConversationMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_rag_v1_rag_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConversationMessage.ProtoReflect.Descriptor instead.
+func (*ConversationMessage) Descriptor() ([]byte, []int) {
+	return file_rag_v1_rag_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ConversationMessage) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
+}
+
+func (x *ConversationMessage) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
 type AnswerRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // Optional correlation ID; generated if empty.
@@ -196,13 +248,14 @@ type AnswerRequest struct {
 	Actor         *Actor                 `protobuf:"bytes,3,opt,name=actor,proto3" json:"actor,omitempty"`
 	Mode          AnswerMode             `protobuf:"varint,4,opt,name=mode,proto3,enum=aibud.rag.v1.AnswerMode" json:"mode,omitempty"`
 	TopK          *uint32                `protobuf:"varint,5,opt,name=top_k,json=topK,proto3,oneof" json:"top_k,omitempty"` // Default 3, valid range 1–50.
+	History       []*ConversationMessage `protobuf:"bytes,6,rep,name=history,proto3" json:"history,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AnswerRequest) Reset() {
 	*x = AnswerRequest{}
-	mi := &file_rag_v1_rag_proto_msgTypes[1]
+	mi := &file_rag_v1_rag_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -214,7 +267,7 @@ func (x *AnswerRequest) String() string {
 func (*AnswerRequest) ProtoMessage() {}
 
 func (x *AnswerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rag_v1_rag_proto_msgTypes[1]
+	mi := &file_rag_v1_rag_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -227,7 +280,7 @@ func (x *AnswerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnswerRequest.ProtoReflect.Descriptor instead.
 func (*AnswerRequest) Descriptor() ([]byte, []int) {
-	return file_rag_v1_rag_proto_rawDescGZIP(), []int{1}
+	return file_rag_v1_rag_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *AnswerRequest) GetRequestId() string {
@@ -265,6 +318,13 @@ func (x *AnswerRequest) GetTopK() uint32 {
 	return 0
 }
 
+func (x *AnswerRequest) GetHistory() []*ConversationMessage {
+	if x != nil {
+		return x.History
+	}
+	return nil
+}
+
 type SearchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -277,7 +337,7 @@ type SearchRequest struct {
 
 func (x *SearchRequest) Reset() {
 	*x = SearchRequest{}
-	mi := &file_rag_v1_rag_proto_msgTypes[2]
+	mi := &file_rag_v1_rag_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -289,7 +349,7 @@ func (x *SearchRequest) String() string {
 func (*SearchRequest) ProtoMessage() {}
 
 func (x *SearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_rag_v1_rag_proto_msgTypes[2]
+	mi := &file_rag_v1_rag_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -302,7 +362,7 @@ func (x *SearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchRequest.ProtoReflect.Descriptor instead.
 func (*SearchRequest) Descriptor() ([]byte, []int) {
-	return file_rag_v1_rag_proto_rawDescGZIP(), []int{2}
+	return file_rag_v1_rag_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SearchRequest) GetRequestId() string {
@@ -343,7 +403,7 @@ type Step struct {
 
 func (x *Step) Reset() {
 	*x = Step{}
-	mi := &file_rag_v1_rag_proto_msgTypes[3]
+	mi := &file_rag_v1_rag_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -355,7 +415,7 @@ func (x *Step) String() string {
 func (*Step) ProtoMessage() {}
 
 func (x *Step) ProtoReflect() protoreflect.Message {
-	mi := &file_rag_v1_rag_proto_msgTypes[3]
+	mi := &file_rag_v1_rag_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -368,7 +428,7 @@ func (x *Step) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Step.ProtoReflect.Descriptor instead.
 func (*Step) Descriptor() ([]byte, []int) {
-	return file_rag_v1_rag_proto_rawDescGZIP(), []int{3}
+	return file_rag_v1_rag_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Step) GetText() string {
@@ -405,7 +465,7 @@ type Source struct {
 
 func (x *Source) Reset() {
 	*x = Source{}
-	mi := &file_rag_v1_rag_proto_msgTypes[4]
+	mi := &file_rag_v1_rag_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -417,7 +477,7 @@ func (x *Source) String() string {
 func (*Source) ProtoMessage() {}
 
 func (x *Source) ProtoReflect() protoreflect.Message {
-	mi := &file_rag_v1_rag_proto_msgTypes[4]
+	mi := &file_rag_v1_rag_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -430,7 +490,7 @@ func (x *Source) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Source.ProtoReflect.Descriptor instead.
 func (*Source) Descriptor() ([]byte, []int) {
-	return file_rag_v1_rag_proto_rawDescGZIP(), []int{4}
+	return file_rag_v1_rag_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Source) GetDocumentId() string {
@@ -533,7 +593,7 @@ type AnswerResponse struct {
 
 func (x *AnswerResponse) Reset() {
 	*x = AnswerResponse{}
-	mi := &file_rag_v1_rag_proto_msgTypes[5]
+	mi := &file_rag_v1_rag_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -545,7 +605,7 @@ func (x *AnswerResponse) String() string {
 func (*AnswerResponse) ProtoMessage() {}
 
 func (x *AnswerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rag_v1_rag_proto_msgTypes[5]
+	mi := &file_rag_v1_rag_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -558,7 +618,7 @@ func (x *AnswerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnswerResponse.ProtoReflect.Descriptor instead.
 func (*AnswerResponse) Descriptor() ([]byte, []int) {
-	return file_rag_v1_rag_proto_rawDescGZIP(), []int{5}
+	return file_rag_v1_rag_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *AnswerResponse) GetRequestId() string {
@@ -627,7 +687,7 @@ type SearchResponse struct {
 
 func (x *SearchResponse) Reset() {
 	*x = SearchResponse{}
-	mi := &file_rag_v1_rag_proto_msgTypes[6]
+	mi := &file_rag_v1_rag_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -639,7 +699,7 @@ func (x *SearchResponse) String() string {
 func (*SearchResponse) ProtoMessage() {}
 
 func (x *SearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_rag_v1_rag_proto_msgTypes[6]
+	mi := &file_rag_v1_rag_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -652,7 +712,7 @@ func (x *SearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchResponse.ProtoReflect.Descriptor instead.
 func (*SearchResponse) Descriptor() ([]byte, []int) {
-	return file_rag_v1_rag_proto_rawDescGZIP(), []int{6}
+	return file_rag_v1_rag_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SearchResponse) GetRequestId() string {
@@ -677,14 +737,18 @@ const file_rag_v1_rag_proto_rawDesc = "" +
 	"\x05Actor\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x12\n" +
 	"\x04role\x18\x02 \x01(\tR\x04role\x12\x12\n" +
-	"\x04team\x18\x03 \x01(\tR\x04team\"\xc7\x01\n" +
+	"\x04team\x18\x03 \x01(\tR\x04team\"C\n" +
+	"\x13ConversationMessage\x12\x12\n" +
+	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"\x84\x02\n" +
 	"\rAnswerRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1a\n" +
 	"\bquestion\x18\x02 \x01(\tR\bquestion\x12)\n" +
 	"\x05actor\x18\x03 \x01(\v2\x13.aibud.rag.v1.ActorR\x05actor\x12,\n" +
 	"\x04mode\x18\x04 \x01(\x0e2\x18.aibud.rag.v1.AnswerModeR\x04mode\x12\x18\n" +
-	"\x05top_k\x18\x05 \x01(\rH\x00R\x04topK\x88\x01\x01B\b\n" +
+	"\x05top_k\x18\x05 \x01(\rH\x00R\x04topK\x88\x01\x01\x12;\n" +
+	"\ahistory\x18\x06 \x03(\v2!.aibud.rag.v1.ConversationMessageR\ahistoryB\b\n" +
 	"\x06_top_k\"\x93\x01\n" +
 	"\rSearchRequest\x12\x1d\n" +
 	"\n" +
@@ -769,37 +833,39 @@ func file_rag_v1_rag_proto_rawDescGZIP() []byte {
 }
 
 var file_rag_v1_rag_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_rag_v1_rag_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_rag_v1_rag_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_rag_v1_rag_proto_goTypes = []any{
-	(AnswerMode)(0),        // 0: aibud.rag.v1.AnswerMode
-	(AnswerStatus)(0),      // 1: aibud.rag.v1.AnswerStatus
-	(*Actor)(nil),          // 2: aibud.rag.v1.Actor
-	(*AnswerRequest)(nil),  // 3: aibud.rag.v1.AnswerRequest
-	(*SearchRequest)(nil),  // 4: aibud.rag.v1.SearchRequest
-	(*Step)(nil),           // 5: aibud.rag.v1.Step
-	(*Source)(nil),         // 6: aibud.rag.v1.Source
-	(*AnswerResponse)(nil), // 7: aibud.rag.v1.AnswerResponse
-	(*SearchResponse)(nil), // 8: aibud.rag.v1.SearchResponse
-	nil,                    // 9: aibud.rag.v1.AnswerResponse.SourcesEntry
+	(AnswerMode)(0),             // 0: aibud.rag.v1.AnswerMode
+	(AnswerStatus)(0),           // 1: aibud.rag.v1.AnswerStatus
+	(*Actor)(nil),               // 2: aibud.rag.v1.Actor
+	(*ConversationMessage)(nil), // 3: aibud.rag.v1.ConversationMessage
+	(*AnswerRequest)(nil),       // 4: aibud.rag.v1.AnswerRequest
+	(*SearchRequest)(nil),       // 5: aibud.rag.v1.SearchRequest
+	(*Step)(nil),                // 6: aibud.rag.v1.Step
+	(*Source)(nil),              // 7: aibud.rag.v1.Source
+	(*AnswerResponse)(nil),      // 8: aibud.rag.v1.AnswerResponse
+	(*SearchResponse)(nil),      // 9: aibud.rag.v1.SearchResponse
+	nil,                         // 10: aibud.rag.v1.AnswerResponse.SourcesEntry
 }
 var file_rag_v1_rag_proto_depIdxs = []int32{
 	2,  // 0: aibud.rag.v1.AnswerRequest.actor:type_name -> aibud.rag.v1.Actor
 	0,  // 1: aibud.rag.v1.AnswerRequest.mode:type_name -> aibud.rag.v1.AnswerMode
-	2,  // 2: aibud.rag.v1.SearchRequest.actor:type_name -> aibud.rag.v1.Actor
-	1,  // 3: aibud.rag.v1.AnswerResponse.status:type_name -> aibud.rag.v1.AnswerStatus
-	5,  // 4: aibud.rag.v1.AnswerResponse.steps:type_name -> aibud.rag.v1.Step
-	9,  // 5: aibud.rag.v1.AnswerResponse.sources:type_name -> aibud.rag.v1.AnswerResponse.SourcesEntry
-	6,  // 6: aibud.rag.v1.SearchResponse.sources:type_name -> aibud.rag.v1.Source
-	6,  // 7: aibud.rag.v1.AnswerResponse.SourcesEntry.value:type_name -> aibud.rag.v1.Source
-	3,  // 8: aibud.rag.v1.RagService.Answer:input_type -> aibud.rag.v1.AnswerRequest
-	4,  // 9: aibud.rag.v1.RagService.Search:input_type -> aibud.rag.v1.SearchRequest
-	7,  // 10: aibud.rag.v1.RagService.Answer:output_type -> aibud.rag.v1.AnswerResponse
-	8,  // 11: aibud.rag.v1.RagService.Search:output_type -> aibud.rag.v1.SearchResponse
-	10, // [10:12] is the sub-list for method output_type
-	8,  // [8:10] is the sub-list for method input_type
-	8,  // [8:8] is the sub-list for extension type_name
-	8,  // [8:8] is the sub-list for extension extendee
-	0,  // [0:8] is the sub-list for field type_name
+	3,  // 2: aibud.rag.v1.AnswerRequest.history:type_name -> aibud.rag.v1.ConversationMessage
+	2,  // 3: aibud.rag.v1.SearchRequest.actor:type_name -> aibud.rag.v1.Actor
+	1,  // 4: aibud.rag.v1.AnswerResponse.status:type_name -> aibud.rag.v1.AnswerStatus
+	6,  // 5: aibud.rag.v1.AnswerResponse.steps:type_name -> aibud.rag.v1.Step
+	10, // 6: aibud.rag.v1.AnswerResponse.sources:type_name -> aibud.rag.v1.AnswerResponse.SourcesEntry
+	7,  // 7: aibud.rag.v1.SearchResponse.sources:type_name -> aibud.rag.v1.Source
+	7,  // 8: aibud.rag.v1.AnswerResponse.SourcesEntry.value:type_name -> aibud.rag.v1.Source
+	4,  // 9: aibud.rag.v1.RagService.Answer:input_type -> aibud.rag.v1.AnswerRequest
+	5,  // 10: aibud.rag.v1.RagService.Search:input_type -> aibud.rag.v1.SearchRequest
+	8,  // 11: aibud.rag.v1.RagService.Answer:output_type -> aibud.rag.v1.AnswerResponse
+	9,  // 12: aibud.rag.v1.RagService.Search:output_type -> aibud.rag.v1.SearchResponse
+	11, // [11:13] is the sub-list for method output_type
+	9,  // [9:11] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_rag_v1_rag_proto_init() }
@@ -807,17 +873,17 @@ func file_rag_v1_rag_proto_init() {
 	if File_rag_v1_rag_proto != nil {
 		return
 	}
-	file_rag_v1_rag_proto_msgTypes[1].OneofWrappers = []any{}
 	file_rag_v1_rag_proto_msgTypes[2].OneofWrappers = []any{}
-	file_rag_v1_rag_proto_msgTypes[4].OneofWrappers = []any{}
+	file_rag_v1_rag_proto_msgTypes[3].OneofWrappers = []any{}
 	file_rag_v1_rag_proto_msgTypes[5].OneofWrappers = []any{}
+	file_rag_v1_rag_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_rag_v1_rag_proto_rawDesc), len(file_rag_v1_rag_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

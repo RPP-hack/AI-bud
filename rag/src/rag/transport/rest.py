@@ -21,12 +21,18 @@ class ActorInput(StrictModel):
     team: str = Field(min_length=1, max_length=128)
 
 
+class ConversationMessage(StrictModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class AnswerInput(StrictModel):
     question: str = Field(min_length=1, max_length=4000)
     actor: ActorInput
     request_id: str = Field(default="", pattern=r"^[A-Za-z0-9_.:-]{0,128}$")
     mode: Literal["offline", "llm"] = "offline"
     top_k: int = Field(default=3, ge=1, le=50)
+    history: list[ConversationMessage] = Field(default_factory=list, max_length=6)
 
 
 class SearchInput(StrictModel):
@@ -158,7 +164,8 @@ def create_app(application=None, token=None, *, lifespan=None):
     @app.post("/v1/answers", dependencies=[Depends(authenticate)], response_model=AnswerOutput)
     def answer(body: AnswerInput):
         return service.answer(body.question, Actor(**body.actor.model_dump()),
-                              request_id=body.request_id, mode=body.mode, top_k=body.top_k)
+                              request_id=body.request_id, mode=body.mode, top_k=body.top_k,
+                              history=[item.model_dump() for item in body.history])
 
     @app.post("/v1/search", dependencies=[Depends(authenticate)], response_model=SearchOutput)
     def search(body: SearchInput):

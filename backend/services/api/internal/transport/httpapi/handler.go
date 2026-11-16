@@ -4,6 +4,7 @@ import (
 	"ai-bud/services/api/internal/access/adapters/tickethttp"
 	"ai-bud/services/api/internal/access/application"
 	"ai-bud/services/api/internal/access/domain"
+	conversation "ai-bud/services/api/internal/conversation/application"
 	"ai-bud/services/api/internal/identity"
 	identitydemo "ai-bud/services/api/internal/identity/demo"
 	"ai-bud/services/api/internal/onboarding"
@@ -46,9 +47,10 @@ func (DemoAuth) Authenticate(r *http.Request) (identity.Actor, bool) {
 
 type actorKey struct{}
 type Handler struct {
-	service *application.Service
-	logger  *slog.Logger
-	rag     ragclient.Gateway
+	service      *application.Service
+	logger       *slog.Logger
+	rag          ragclient.Gateway
+	conversation *conversation.Service
 }
 
 func New(service *application.Service, auth Authenticator, ping func(context.Context) error, logger *slog.Logger, options ...func(*Handler)) http.Handler {
@@ -70,6 +72,9 @@ func New(service *application.Service, auth Authenticator, ping func(context.Con
 	api.HandleFunc("GET /api/onboarding", h.progress)
 	api.HandleFunc("POST /api/rag/answers", h.answer)
 	api.HandleFunc("POST /api/rag/search", h.search)
+	api.HandleFunc("GET /api/conversation", h.currentConversation)
+	api.HandleFunc("POST /api/conversation/new", h.newConversation)
+	api.HandleFunc("POST /api/conversations/{id}/messages", h.sendMessage)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { write(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /ready", func(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +93,7 @@ func New(service *application.Service, auth Authenticator, ping func(context.Con
 			return
 		}
 		timeout := 10 * time.Second
-		if r.URL.Path == "/api/rag/answers" || r.URL.Path == "/api/rag/search" {
+		if r.URL.Path == "/api/rag/answers" || r.URL.Path == "/api/rag/search" || strings.HasPrefix(r.URL.Path, "/api/conversations/") {
 			timeout = ragclient.Timeout + 5*time.Second
 		}
 		ctx, cancel := context.WithTimeout(context.WithValue(r.Context(), actorKey{}, a), timeout)
