@@ -36,6 +36,11 @@ message ConversationMessage {
   string content = 2;
 }
 
+message ConversationMessage {
+  string role = 1;
+  string content = 2;
+}
+
 message AnswerRequest {
   string request_id = 1; // Optional correlation ID; generated if empty.
   string question = 2;
