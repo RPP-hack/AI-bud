@@ -1,10 +1,9 @@
 FROM python:3.11.14-slim-bookworm AS base
 WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1 RAG_DB_PATH=/data/ai-buddy.sqlite3
+ENV PYTHONDONTWRITEBYTECODE=1
 COPY pyproject.toml README.md ./
 COPY src/ src/
 COPY knowledge/ knowledge/
-RUN mkdir /data && python -c "import sqlite3; sqlite3.connect(':memory:').execute('CREATE VIRTUAL TABLE t USING fts5(text)')"
 ENTRYPOINT ["python", "-m", "rag"]
 CMD ["--help"]
 

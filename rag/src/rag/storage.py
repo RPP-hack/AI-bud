@@ -1,4 +1,4 @@
-"""A local FTS5 index. Each manifest is published as one SQLite transaction."""
+"""Storage factory and an explicit SQLite adapter for offline fixtures/legacy demos."""
 
 import json
 import os
@@ -54,6 +54,15 @@ class Audience:
             raise ValueError("Supply an employee role and a concrete team")
 
 
+class StorageError(RuntimeError):
+    pass
+
+
+def create_store():
+    from .vector_storage import PgVectorStore
+    return PgVectorStore()
+
+
 class SQLiteStore:
     def __init__(self, path=None):
         self.path = Path(path or os.environ.get("RAG_DB_PATH", "ai-buddy.sqlite3"))
@@ -93,7 +102,15 @@ class SQLiteStore:
                     db.execute("INSERT INTO passages(rowid, title_terms, body_terms) VALUES(?, ?, ?)",
                                (row.lastrowid, title_terms, " ".join(search_terms(chunk.text))))
 
-    def search(self, terms, audience, top_k, today: date):
+    def ready(self):
+        with self.connect(read_only=True) as db:
+            return (db.execute("SELECT count(*) FROM documents WHERE current=1").fetchone()[0] > 0
+                    and db.execute("SELECT count(*) FROM passages").fetchone()[0] > 0)
+
+    def search(self, query, audience, top_k, today: date, *, timeout_seconds=None):
+        terms = list(dict.fromkeys(search_terms(query)))
+        if not terms:
+            return []
         match = " OR ".join(f'"{term}"' for term in terms)
         params = dict(role=audience.role, team=audience.team, match=match, today=today.isoformat())
         with self.connect(read_only=True) as db:
@@ -131,3 +148,31 @@ class SQLiteStore:
                             selected.append(row)
                             seen.add(row["version_id"])
             return selected
+
+    @contextmanager
+    def access_transaction(self, *, confirm):
+        with self.connect(read_only=not confirm) as db:
+            db.execute("BEGIN IMMEDIATE" if confirm else "BEGIN")
+            yield db
+
+    @staticmethod
+    def access_rules(db, audience, today):
+        return db.execute("""
+            SELECT document_id, rule_value FROM documents d
+            WHERE current = 1 AND (team = '*' OR team = ?) AND rule_key = 'jira.bud.read'
+              AND (review_by IS NULL OR review_by >= ?)
+              AND EXISTS (SELECT 1 FROM json_each(d.roles) WHERE value = ?)
+        """, (audience.team, today.isoformat(), audience.role)).fetchall()
+
+    @staticmethod
+    def access_receipt(db, employee, fields, *, confirm):
+        if confirm:
+            db.execute("""
+                INSERT INTO access_requests(employee, project, permission, reason, status)
+                VALUES(:employee, :project, :permission, :reason, 'pending')
+                ON CONFLICT(employee, project, permission) DO NOTHING
+            """, dict(employee=employee, **fields))
+        return db.execute("""
+            SELECT id, status, reason FROM access_requests
+            WHERE employee = ? AND project = ? AND permission = ?
+        """, (employee, fields["project"], fields["permission"])).fetchone()

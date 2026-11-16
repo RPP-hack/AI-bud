@@ -8,17 +8,40 @@ services:
     volumes:
       - ./gateway:/etc/caddy
       - ./frontend:/var/www/html
+  rag-db:
+    profiles: ["rag"]
+    image: pgvector/pgvector:0.8.1-pg17
+    environment:
+      POSTGRES_USER: buddy
+      POSTGRES_PASSWORD: buddy-local
+      POSTGRES_DB: buddy
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - rag-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buddy -d buddy"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
   rag:
     profiles: ["rag"]
     build:
       context: ./rag
       target: demo
     environment:
+      RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
+      RAG_EMBEDDING_API_KEY: "${RAG_EMBEDDING_API_KEY:-${RAG_LLM_API_KEY:-}}"
+      RAG_EMBEDDING_BASE_URL: "${RAG_EMBEDDING_BASE_URL:-https://openrouter.ai/api/v1}"
+      RAG_EMBEDDING_MODEL: "${RAG_EMBEDDING_MODEL:-openai/text-embedding-3-small}"
+      RAG_EMBEDDING_DIMENSIONS: "${RAG_EMBEDDING_DIMENSIONS:-1536}"
+      RAG_MIN_SIMILARITY: "${RAG_MIN_SIMILARITY:-0.3}"
       RAG_LLM_API_KEY: "${RAG_LLM_API_KEY:-}"
       RAG_LLM_BASE_URL: "${RAG_LLM_BASE_URL:-https://openrouter.ai/api/v1}"
       RAG_LLM_MODEL: "${RAG_LLM_MODEL:-openai/gpt-4o-mini}"
-    volumes:
-      - rag-data:/data
+    depends_on:
+      rag-db:
+        condition: service_healthy
 
 volumes:
-  rag-data:
+  rag-db:

@@ -20,28 +20,13 @@ def request_access(store, employee, *, confirm=False):
     audience = PROFILES.get(employee)
     if audience != Audience("intern", "platform"):
         raise PermissionError("Эта операция недоступна для текущего профиля.")
-    with store.connect(read_only=not confirm) as db:
-        db.execute("BEGIN IMMEDIATE" if confirm else "BEGIN")
-        rows = db.execute("""
-            SELECT document_id, rule_value FROM documents d
-            WHERE current = 1 AND (team = '*' OR team = ?) AND rule_key = 'jira.bud.read'
-              AND (review_by IS NULL OR review_by >= ?)
-              AND EXISTS (SELECT 1 FROM json_each(d.roles) WHERE value = ?)
-        """, (audience.team, date.today().isoformat(), audience.role)).fetchall()
+    with store.access_transaction(confirm=confirm) as db:
+        rows = store.access_rules(db, audience, date.today())
         if (not any(row["document_id"] == "jira-access" for row in rows)
                 or {row["rule_value"] for row in rows} != {"Подать заявку на чтение BUD"}):
             raise PermissionError("Нет согласованной действующей инструкции. Уточни шаг у наставника.")
         result = dict(JIRA_REQUEST, status="draft", next_step="Проверь поля и подтверди отправку.")
-        if confirm:
-            db.execute("""
-                INSERT INTO access_requests(employee, project, permission, reason, status)
-                VALUES(:employee, :project, :permission, :reason, 'pending')
-                ON CONFLICT(employee, project, permission) DO NOTHING
-            """, dict(employee=employee, **JIRA_REQUEST))
-        row = db.execute("""
-            SELECT id, status, reason FROM access_requests
-            WHERE employee = ? AND project = ? AND permission = ?
-        """, (employee, JIRA_REQUEST["project"], JIRA_REQUEST["permission"])).fetchone()
+        row = store.access_receipt(db, employee, JIRA_REQUEST, confirm=confirm)
         if row is None:
             return result
         return dict(result, request_id=f"BUD-ACCESS-{row['id']}", status=row["status"],

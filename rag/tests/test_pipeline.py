@@ -229,7 +229,9 @@ class PipelineTests(unittest.TestCase):
             with redirect_stdout(out), redirect_stderr(io.StringIO()):
                 main(args)
             return out.getvalue()
-        with patch.dict(os.environ, {"RAG_DB_PATH": str(self.store.path), "RAG_LLM_API_KEY": ""}):
+        with (patch.dict(os.environ, {"RAG_LLM_API_KEY": ""}),
+              patch("rag.__main__.create_store", return_value=self.store),
+              patch("rag.ingestion.indexing.create_store", return_value=self.store)):
             self.assertIn("документов", run("index", str(self.manifest)))
             self.assertIn("учебный пример", run("ask", "Jira 403"))
             self.assertIn("access", json.loads(run("ask", "Jira 403", "--json"))["action"])

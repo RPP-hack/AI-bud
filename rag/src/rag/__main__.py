@@ -9,10 +9,11 @@ import sys
 
 from .access import PROFILES, request_access
 from .generation import GenerationError
+from .embeddings import EmbeddingError
 from .ingestion.indexing import main as index
 from .pipeline import ask
 from .retrieval import Retriever
-from .storage import SQLiteStore
+from .storage import StorageError, create_store
 
 _STATUS = {
     "conflict": "Инструкции расходятся", "insufficient_evidence": "Недостаточно сведений",
@@ -44,8 +45,8 @@ def main(argv=None):
             tool.add_argument("--confirm", action="store_true", help="Отправить показанную тестовую заявку")
     options = parser.parse_args(args)
     audience = PROFILES[options.profile]
-    store = SQLiteStore()
     try:
+        store = create_store()
         if options.command == "access":
             output = request_access(store, options.profile, confirm=options.confirm)
             print(json.dumps(output, ensure_ascii=False, indent=2))
@@ -70,7 +71,7 @@ def main(argv=None):
             print(f"[{key}] {p.title} ({origin}{locator}) · {p.source_url or p.source_path}")
         if result.action:
             print(f"Посмотреть тестовую заявку: python -m rag access --profile {options.profile}")
-    except (ValueError, GenerationError, PermissionError, sqlite3.Error) as exc:
+    except (ValueError, GenerationError, EmbeddingError, StorageError, PermissionError, sqlite3.Error) as exc:
         if isinstance(exc, sqlite3.OperationalError) and not store.path.exists():
             parser.exit(1, "Индекс отсутствует. Выполни python -m rag index.\n")
         parser.exit(1, f"AI-buddy: {exc}\n")
