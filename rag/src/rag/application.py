@@ -16,6 +16,7 @@ from .pipeline import ask
 from .retrieval import Retriever
 from .storage import Audience, StorageError, create_store
 from .guardrails import validate_question
+from .conversation import validate_history
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +112,12 @@ class RagApplication:
         finally:
             self._slots.release()
 
-    def answer(self, question, actor, *, request_id="", mode="offline", top_k=3, timeout_seconds=None):
+    def answer(self, question, actor, *, request_id="", mode="offline", top_k=3, timeout_seconds=None, history=None):
         audience, request_id = self._validate(question, actor, top_k, request_id)
+        try:
+            history = validate_history(history)
+        except ValueError:
+            raise ApplicationError("invalid_input") from None
         if mode not in ("offline", "llm"):
             raise ApplicationError("invalid_input")
         with self._attempt(timeout_seconds) as remaining:
@@ -124,11 +129,13 @@ class RagApplication:
                     timeout = remaining()
                     if timeout <= 0:
                         raise ApplicationError("deadline_exceeded")
-                    return factory(timeout)._complete(question, audience, fresh)
+                    generator = factory(timeout)
+                    generator.history = history
+                    return generator._complete(question, audience, fresh)
 
             result = ask(question, audience=audience, store=self.store,
                          generator=DeadlineGenerator(), offline=mode == "offline", top_k=top_k,
-                         timeout_seconds=remaining())
+                         timeout_seconds=remaining(), history=history)
             response = dict(request_id=request_id, status=result.status, mode=result.mode,
                             steps=[asdict(step) for step in result.steps],
                             sources={key: source_view(chunk) for key, chunk in result.sources.items()},

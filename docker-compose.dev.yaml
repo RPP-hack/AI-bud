@@ -52,6 +52,9 @@ services:
     environment: &rag-storage
       RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
       HF_HOME: /models
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      DISABLE_SAFETENSORS_CONVERSION: "1"
     volumes:
       - rag-models:/models
     depends_on:

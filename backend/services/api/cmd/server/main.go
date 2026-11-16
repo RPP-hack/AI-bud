@@ -5,6 +5,8 @@ import (
 	"ai-bud/services/api/internal/access/adapters/postgres"
 	"ai-bud/services/api/internal/access/adapters/tickethttp"
 	"ai-bud/services/api/internal/access/application"
+	conversationdb "ai-bud/services/api/internal/conversation/adapters/postgres"
+	conversation "ai-bud/services/api/internal/conversation/application"
 	identitydemo "ai-bud/services/api/internal/identity/demo"
 	"ai-bud/services/api/internal/platform/bootstrap"
 	"ai-bud/services/api/internal/platform/config"
@@ -30,14 +32,17 @@ func main() {
 			app.Background = worker.Run
 		}
 		var options []func(*httpapi.Handler)
+		var responder conversation.Responder
 		if c.RAGTarget != "" {
 			client, err := ragclient.New(c.RAGTarget, c.RAGToken)
 			if err != nil {
 				return bootstrap.Application{}, err
 			}
 			app.Close = client.Close
+			responder = client
 			options = append(options, httpapi.WithRAG(client))
 		}
+		options = append(options, httpapi.WithConversation(conversation.New(conversationdb.New(pool), responder)))
 		app.Handler = httpapi.New(svc, httpapi.DemoAuth{}, pool.Ping, logger, options...)
 		return app, nil
 	}); err != nil {

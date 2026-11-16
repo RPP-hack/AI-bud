@@ -58,6 +58,19 @@ export type Progress = {
     | "create_new_proposal";
 };
 
+export type ConversationTurn = {
+  id: string;
+  client_id: string;
+  question: string;
+  mode: "offline" | "llm";
+  top_k: number;
+  state: "pending" | "completed" | "failed";
+  answer?: Answer;
+  error_code?: string;
+  created_at: string;
+};
+export type Conversation = { id: string; turns: ConversationTurn[] };
+
 export class ApiError extends Error {
   constructor(
     public code: string,
@@ -87,6 +100,10 @@ export const errorText = (error: unknown): string => {
         request_cancelled:
           "Ожидание остановлено. Операция на сервере могла продолжиться.",
         internal_error: "Не удалось обработать запрос. Попробуйте позже.",
+        interrupted:
+          "Ответ был прерван перезапуском сервиса. Можно повторить запрос.",
+        conversation_full:
+          "Этот диалог достиг лимита сообщений. Начните новый диалог.",
         invalid_response: "Сервис вернул неожиданный ответ. Попробуйте позже.",
         network_error:
           "Нет связи с сервисом. Проверьте подключение и повторите запрос.",
@@ -145,6 +162,40 @@ export class Api {
     if (!data || typeof data !== "object")
       throw new ApiError("invalid_response", response.status);
     return data as T;
+  }
+  conversation(signal?: AbortSignal) {
+    return this.request<Conversation>(
+      "/api/conversation",
+      "GET",
+      undefined,
+      undefined,
+      signal,
+    );
+  }
+  newConversation(conversation_id: string, signal?: AbortSignal) {
+    return this.request<Conversation>(
+      "/api/conversation/new",
+      "POST",
+      { conversation_id },
+      undefined,
+      signal,
+    );
+  }
+  sendMessage(
+    id: string,
+    key: string,
+    question: string,
+    mode: "offline" | "llm",
+    top_k: number,
+    signal?: AbortSignal,
+  ) {
+    return this.request<ConversationTurn>(
+      `/api/conversations/${encodeURIComponent(id)}/messages`,
+      "POST",
+      { question, mode, top_k },
+      { "Idempotency-Key": key },
+      signal,
+    );
   }
   me(signal?: AbortSignal) {
     return this.request<Actor>("/api/me", "GET", undefined, undefined, signal);

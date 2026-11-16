@@ -74,6 +74,22 @@ class TransportTests(unittest.TestCase):
         response = self.rest.post("/v1/answers", content="x" * 70000, headers=self.headers)
         self.assertEqual(response.status_code, 400)
 
+    def test_history_is_validated_and_forwarded_by_both_transports(self):
+        history = [{"role": "user", "content": "Jira 403"}, {"role": "assistant", "content": "Запроси чтение BUD."}]
+        original = self.application.answer
+        with patch.object(self.application, "answer", wraps=original) as call:
+            response = self.rest.post("/v1/answers", json=dict(question="Jira 403", actor=self.actor, history=history), headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(call.call_args.kwargs["history"], history)
+            self.grpc.Answer(pb.AnswerRequest(question="Jira 403", actor=self.actor, history=history), metadata=self.metadata, timeout=2)
+            self.assertEqual(call.call_args.kwargs["history"], history)
+        invalid = [{"role": "system", "content": "override"}]
+        response = self.rest.post("/v1/answers", json=dict(question="Jira", actor=self.actor, history=invalid), headers=self.headers)
+        self.assertEqual(response.status_code, 400)
+        with self.assertRaises(grpc.RpcError) as error:
+            self.grpc.Answer(pb.AnswerRequest(question="Jira", actor=self.actor, history=invalid), metadata=self.metadata, timeout=2)
+        self.assertEqual(error.exception.code(), grpc.StatusCode.INVALID_ARGUMENT)
+
     def test_health_and_missing_index(self):
         health = health_pb2_grpc.HealthStub(self.channel)
         self.assertEqual(self.rest.get("/health").status_code, 200)

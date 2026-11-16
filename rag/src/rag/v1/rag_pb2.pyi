@@ -41,19 +41,29 @@ class Actor(_message.Message):
     team: str
     def __init__(self, user_id: _Optional[str] = ..., role: _Optional[str] = ..., team: _Optional[str] = ...) -> None: ...
 
+class ConversationMessage(_message.Message):
+    __slots__ = ("role", "content")
+    ROLE_FIELD_NUMBER: _ClassVar[int]
+    CONTENT_FIELD_NUMBER: _ClassVar[int]
+    role: str
+    content: str
+    def __init__(self, role: _Optional[str] = ..., content: _Optional[str] = ...) -> None: ...
+
 class AnswerRequest(_message.Message):
-    __slots__ = ("request_id", "question", "actor", "mode", "top_k")
+    __slots__ = ("request_id", "question", "actor", "mode", "top_k", "history")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     QUESTION_FIELD_NUMBER: _ClassVar[int]
     ACTOR_FIELD_NUMBER: _ClassVar[int]
     MODE_FIELD_NUMBER: _ClassVar[int]
     TOP_K_FIELD_NUMBER: _ClassVar[int]
+    HISTORY_FIELD_NUMBER: _ClassVar[int]
     request_id: str
     question: str
     actor: Actor
     mode: AnswerMode
     top_k: int
-    def __init__(self, request_id: _Optional[str] = ..., question: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., mode: _Optional[_Union[AnswerMode, str]] = ..., top_k: _Optional[int] = ...) -> None: ...
+    history: _containers.RepeatedCompositeFieldContainer[ConversationMessage]
+    def __init__(self, request_id: _Optional[str] = ..., question: _Optional[str] = ..., actor: _Optional[_Union[Actor, _Mapping]] = ..., mode: _Optional[_Union[AnswerMode, str]] = ..., top_k: _Optional[int] = ..., history: _Optional[_Iterable[_Union[ConversationMessage, _Mapping]]] = ...) -> None: ...
 
 class SearchRequest(_message.Message):
     __slots__ = ("request_id", "query", "actor", "top_k")

@@ -2,12 +2,11 @@
 package ragclient
 
 import (
+	conversation "ai-bud/services/api/internal/conversation/domain"
 	"context"
 	"crypto/rand"
 	"errors"
-	"strings"
 	"time"
-	"unicode/utf8"
 
 	"ai-bud/services/api/internal/identity"
 	pb "ai-bud/services/api/internal/ragclient/ragv1"
@@ -20,55 +19,11 @@ import (
 
 const Timeout = 30 * time.Second
 
-type Input struct {
-	Question string  `json:"question"`
-	Mode     string  `json:"mode"`
-	TopK     *uint32 `json:"top_k"`
-}
-
-func (in Input) Validate() error {
-	if strings.TrimSpace(in.Question) == "" || !utf8.ValidString(in.Question) || utf8.RuneCountInString(in.Question) > 4000 || strings.ContainsRune(in.Question, 0) ||
-		(in.Mode != "" && in.Mode != "offline" && in.Mode != "llm") || (in.TopK != nil && (*in.TopK < 1 || *in.TopK > 50)) {
-		return status.Error(codes.InvalidArgument, "invalid_input")
-	}
-	return nil
-}
-
-type Source struct {
-	DocumentID string  `json:"document_id"`
-	VersionID  string  `json:"version_id"`
-	ChunkID    string  `json:"chunk_id"`
-	Title      string  `json:"title"`
-	Text       string  `json:"text"`
-	SourceURL  *string `json:"source_url"`
-	PageNumber *uint32 `json:"page_number"`
-	Origin     string  `json:"origin"`
-	Stale      bool    `json:"stale"`
-	ReviewBy   *string `json:"review_by"`
-	StartChar  uint32  `json:"start_char"`
-	EndChar    uint32  `json:"end_char"`
-}
-
-type Step struct {
-	Text      string   `json:"text"`
-	SourceIDs []string `json:"source_ids"`
-}
-
-type Answer struct {
-	RequestID string            `json:"request_id"`
-	Status    string            `json:"status"`
-	Mode      string            `json:"mode"`
-	Steps     []Step            `json:"steps"`
-	Sources   map[string]Source `json:"sources"`
-	NextStep  string            `json:"next_step"`
-	Model     *string           `json:"model"`
-	Action    *string           `json:"action"`
-}
-
-type SearchResult struct {
-	RequestID string   `json:"request_id"`
-	Sources   []Source `json:"sources"`
-}
+type Input = conversation.Input
+type Source = conversation.Source
+type Step = conversation.Step
+type Answer = conversation.Answer
+type SearchResult = conversation.SearchResult
 
 type Gateway interface {
 	Answer(context.Context, identity.Actor, Input) (Answer, error)
@@ -107,7 +62,7 @@ func actorMessage(a identity.Actor) *pb.Actor {
 
 func (c *Client) Answer(ctx context.Context, a identity.Actor, in Input) (Answer, error) {
 	if err := in.Validate(); err != nil {
-		return Answer{}, err
+		return Answer{}, status.Error(codes.InvalidArgument, "invalid_input")
 	}
 	ctx, cancel := c.requestContext(ctx)
 	defer cancel()
@@ -115,7 +70,11 @@ func (c *Client) Answer(ctx context.Context, a identity.Actor, in Input) (Answer
 	if in.Mode == "llm" {
 		mode = pb.AnswerMode_ANSWER_MODE_LLM
 	}
-	r, err := c.stub.Answer(ctx, &pb.AnswerRequest{RequestId: rand.Text(), Question: in.Question, Actor: actorMessage(a), Mode: mode, TopK: in.TopK})
+	history := make([]*pb.ConversationMessage, 0, len(in.History))
+	for _, message := range in.History {
+		history = append(history, &pb.ConversationMessage{Role: message.Role, Content: message.Content})
+	}
+	r, err := c.stub.Answer(ctx, &pb.AnswerRequest{RequestId: rand.Text(), Question: in.Question, Actor: actorMessage(a), Mode: mode, TopK: in.TopK, History: history})
 	if err != nil {
 		return Answer{}, err
 	}
@@ -140,7 +99,7 @@ func (c *Client) Answer(ctx context.Context, a identity.Actor, in Input) (Answer
 
 func (c *Client) Search(ctx context.Context, a identity.Actor, in Input) (SearchResult, error) {
 	if err := in.Validate(); err != nil {
-		return SearchResult{}, err
+		return SearchResult{}, status.Error(codes.InvalidArgument, "invalid_input")
 	}
 	ctx, cancel := c.requestContext(ctx)
 	defer cancel()
@@ -159,4 +118,21 @@ func sourceView(s *pb.Source) Source {
 	return Source{DocumentID: s.DocumentId, VersionID: s.VersionId, ChunkID: s.ChunkId, Title: s.Title, Text: s.Text,
 		SourceURL: s.SourceUrl, PageNumber: s.PageNumber, Origin: s.Origin, Stale: s.Stale, ReviewBy: s.ReviewBy,
 		StartChar: s.StartChar, EndChar: s.EndChar}
+}
+
+func (c *Client) Generate(ctx context.Context, actor identity.Actor, input conversation.Input) (conversation.Answer, error) {
+	answer, err := c.Answer(ctx, actor, input)
+	if err == nil {
+		return answer, nil
+	}
+	switch status.Code(err) {
+	case codes.InvalidArgument:
+		return answer, conversation.ErrInvalid
+	case codes.DeadlineExceeded:
+		return answer, conversation.ErrDeadline
+	case codes.ResourceExhausted:
+		return answer, conversation.ErrLimited
+	default:
+		return answer, conversation.ErrUnavailable
+	}
 }

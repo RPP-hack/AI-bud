@@ -12,8 +12,46 @@ import { Assistant } from "../src/Assistant";
 import { Buddy, Icon, RequestStatus, SourceCard } from "../src/ui";
 import { actor, answer, request, source } from "./fixtures";
 
+function persistence(api: Api) {
+  vi.spyOn(api, "conversation").mockResolvedValue({
+    id: "conversation-1",
+    turns: [],
+  });
+  vi.spyOn(api, "newConversation").mockResolvedValue({
+    id: "conversation-2",
+    turns: [],
+  });
+  vi.spyOn(api, "sendMessage").mockImplementation(
+    async (_id, key, question, mode, top_k, signal) => {
+      const base = {
+        id: key,
+        client_id: key,
+        question,
+        mode,
+        top_k,
+        created_at: "2026-11-16T00:00:00Z",
+      };
+      try {
+        return {
+          ...base,
+          state: "completed",
+          answer: await api.answer(question, mode, top_k, signal),
+        };
+      } catch (error) {
+        if (error instanceof ApiError && error.code === "request_cancelled")
+          throw error;
+        return {
+          ...base,
+          state: "failed",
+          error_code: "temporarily_unavailable",
+        };
+      }
+    },
+  );
+}
 function setup(search = false, result = answer) {
   const api = new Api("test");
+  persistence(api);
   const onProposal = vi.fn();
   vi.spyOn(api, "answer").mockResolvedValue(result);
   vi.spyOn(api, "search").mockResolvedValue({
@@ -144,6 +182,7 @@ describe("assistant and evidence", () => {
   });
   it("ignores responses after unmount and stops a timed out request", async () => {
     const api = new Api("test");
+    persistence(api);
     let signal: AbortSignal | undefined;
     vi.spyOn(api, "answer").mockImplementation((_q, _m, _k, s) => {
       signal = s;
@@ -151,6 +190,12 @@ describe("assistant and evidence", () => {
     });
     const view = render(
       <Assistant api={api} actor={actor} search={false} onProposal={vi.fn()} />,
+    );
+    await waitFor(() => expect(api.conversation).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Восстанавливаем переписку…"),
+      ).not.toBeInTheDocument(),
     );
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "Jira" },

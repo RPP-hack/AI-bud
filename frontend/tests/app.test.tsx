@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
 import { actor, answer } from "./fixtures";
 function installFetch() {
+  const histories = new Map<string, any[]>();
   const mock = vi.fn(async (url: RequestInfo | URL, options?: RequestInit) => {
     const token = (options?.headers as Record<string, string>)?.Authorization;
     const identity = token?.includes("mentor")
@@ -13,11 +14,26 @@ function installFetch() {
         : token?.includes("sam")
           ? { id: "sam", role: "intern", team: "payments" }
           : actor;
-    const data =
-      url === "/api/me"
-        ? identity
-        : String(url).includes("/api/rag/answers")
-          ? answer
+    const owner = token ?? "";
+    const turns = histories.get(owner) ?? [];
+    let data: unknown;
+    if (url === "/api/conversation") data = { id: "conversation-1", turns };
+    else if (String(url).includes("/messages")) {
+      const body = JSON.parse(String(options?.body));
+      const turn = {
+        id: String(turns.length + 1),
+        client_id: "key",
+        ...body,
+        state: "completed",
+        answer,
+        created_at: "2026-11-16T00:00:00Z",
+      };
+      histories.set(owner, [...turns, turn]);
+      data = turn;
+    } else
+      data =
+        url === "/api/me"
+          ? identity
           : String(url).includes("/api/")
             ? { items: [] }
             : { status: "ready" };
@@ -51,7 +67,9 @@ describe("application shell and identity isolation", () => {
     await user.click(screen.getByRole("button", { name: "База знаний" }));
     expect(await screen.findByText(/Нужная инструкция/)).toBeVisible();
     await user.click(screen.getByRole("link", { name: /ai/ }));
-    expect(await screen.findByText(/Осваивайся/)).toBeVisible();
+    expect(
+      (await screen.findAllByText("Запроси чтение BUD.")).length,
+    ).toBeGreaterThan(0);
     await user.selectOptions(
       screen.getByLabelText("Учебный профиль"),
       "demo-mentor-platform",
@@ -92,7 +110,13 @@ describe("application shell and identity isolation", () => {
     mock.mockImplementation(
       async (url) =>
         new Response(
-          JSON.stringify(url === "/api/me" ? actor : { status: "ready" }),
+          JSON.stringify(
+            url === "/api/me"
+              ? actor
+              : url === "/api/conversation"
+                ? { id: "conversation-1", turns: [] }
+                : { status: "ready" },
+          ),
         ),
     );
     await user.click(
