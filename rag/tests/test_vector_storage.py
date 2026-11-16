@@ -36,6 +36,15 @@ def passage(**changes):
 
 
 class VectorStorageTests(unittest.TestCase):
+    def test_indexing_without_a_key_fails_before_database_access_even_for_cached_vectors(self):
+        embedder = Mock(config=EmbeddingConfig())
+        store = PgVectorStore(embedder=embedder)
+        with patch.object(store, "connect") as connect:
+            with self.assertRaisesRegex(EmbeddingError, "RAG_EMBEDDING_API_KEY or RAG_LLM_API_KEY"):
+                store.publish([])
+        connect.assert_not_called()
+        embedder.embed.assert_not_called()
+
     def test_defaults_use_pgvector_even_with_legacy_sqlite_environment(self):
         with patch.dict(os.environ, {"RAG_DB_PATH": "legacy.sqlite3"}, clear=True):
             self.assertIsInstance(create_store(), PgVectorStore)

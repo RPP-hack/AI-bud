@@ -33,6 +33,12 @@ Gateway Caddy обслуживает статическую сборку и пр
 Внутри Compose используются имена сервисов `db`, `mock-access` и `rag`, а не
 `localhost`.
 
+Для RAG создайте `rag/.env` из `rag/.env.example` и заполните
+`RAG_EMBEDDING_API_KEY` (или `RAG_LLM_API_KEY`). Этот файл переопределяет настройки
+из `rag/.env.compose.example` одинаково для `rag-index`, `rag` и `rag-cli`.
+Ключ нужен и для режима `offline`: он отключает генерацию ответа, а поиск
+по-прежнему использует embedding API. Без ключа индексатор завершится с явной ошибкой.
+
 Остановка:
 
 ```sh

@@ -44,20 +44,26 @@ services:
       target: server
     entrypoint: ["python", "-m", "rag"]
     command: ["index"]
-    env_file:
+    env_file: &rag-env
       - ./rag/.env.compose.example
-    volumes:
-      - rag-data:/data
+      - path: ./rag/.env
+        required: false
+    environment:
+      RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
+    depends_on:
+      rag-db:
+        condition: service_healthy
 
   rag:
     build:
       context: ./rag
       target: server
-    env_file:
-      - ./rag/.env.compose.example
-    volumes:
-      - rag-data:/data:ro
+    env_file: *rag-env
+    environment:
+      RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
     depends_on:
+      rag-db:
+        condition: service_healthy
       rag-index:
         condition: service_completed_successfully
     healthcheck:
@@ -84,7 +90,6 @@ services:
       - ./gateway:/etc/caddy
       - ./frontend:/var/www/html
   rag-db:
-    profiles: ["rag"]
     image: pgvector/pgvector:0.8.1-pg17
     environment:
       POSTGRES_USER: buddy
@@ -99,24 +104,19 @@ services:
       interval: 2s
       timeout: 3s
       retries: 20
-  rag:
+  rag-cli:
     profiles: ["rag"]
     build:
       context: ./rag
       target: demo
+    env_file: *rag-env
     environment:
       RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
-      RAG_EMBEDDING_API_KEY: "${RAG_EMBEDDING_API_KEY:-${RAG_LLM_API_KEY:-}}"
-      RAG_EMBEDDING_BASE_URL: "${RAG_EMBEDDING_BASE_URL:-https://openrouter.ai/api/v1}"
-      RAG_EMBEDDING_MODEL: "${RAG_EMBEDDING_MODEL:-openai/text-embedding-3-small}"
-      RAG_EMBEDDING_DIMENSIONS: "${RAG_EMBEDDING_DIMENSIONS:-1536}"
-      RAG_MIN_SIMILARITY: "${RAG_MIN_SIMILARITY:-0.3}"
-      RAG_LLM_API_KEY: "${RAG_LLM_API_KEY:-}"
-      RAG_LLM_BASE_URL: "${RAG_LLM_BASE_URL:-https://openrouter.ai/api/v1}"
-      RAG_LLM_MODEL: "${RAG_LLM_MODEL:-openai/gpt-4o-mini}"
     depends_on:
       rag-db:
         condition: service_healthy
 
 volumes:
+  buddy-db:
+  frontend-node-modules:
   rag-db:

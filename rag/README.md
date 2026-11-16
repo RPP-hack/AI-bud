@@ -38,10 +38,10 @@ python3 -m rag.evaluation run --output rag/evals/reports/offline.json
 ## Docker
 
 ```sh
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --build --rm rag index
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag ask 'Не открывается Jira, ошибка 403' --offline
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag access
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag access --confirm
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --build --rm rag-cli index
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli ask 'Не открывается Jira, ошибка 403' --offline
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli access
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli access --confirm
 ```
 
 Том PostgreSQL хранит документы, фрагменты, векторы и тестовые заявки. Для полного стека выполните `docker compose -f backend/compose.yaml --env-file rag/.env up --build`: индексатор дождётся БД, а сервер — завершения индексации. Внутри БД RAG использует отдельную схему `rag`, не затрагивая таблицы Go API. При локальном запуске подключение задаёт `RAG_DATABASE_URL`, по умолчанию `postgresql://buddy:buddy-local@localhost:55432/buddy`. Для переноса прежней базы SQLite повторно выполните `python3 -m rag index` с исходным манифестом.
@@ -73,7 +73,7 @@ set -a
 . ./rag/.env
 set +a
 python3 -m rag ask 'Как скачать репозиторий?'
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag ask 'Как скачать репозиторий?'
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli ask 'Как скачать репозиторий?'
 ```
 
 Команда `ask` без chat-ключа или с `--offline` явно помечает режим и показывает выдержку. Поиск всё равно требует embedding API и PostgreSQL. С chat-ключом выполняется один запрос к генеративной модели с проверкой структуры ответа и идентификаторов цитат. Ошибка провайдера отображается как ошибка, повтор возможен по запросу. Известный конфликт, просроченный единственный источник и отсутствие результатов обрабатываются локально.

@@ -6,7 +6,7 @@ import math
 import os
 import time
 
-from .embeddings import EmbeddingClient, normalize_vector
+from .embeddings import EmbeddingClient, EmbeddingError, normalize_vector
 from .storage import StorageError, _COLUMNS
 
 
@@ -94,6 +94,8 @@ class PgVectorStore:
                                    "WHERE d.current LIMIT 1").fetchone() is not None)
 
     def publish(self, documents):
+        if not self.embedder.config.api_key:
+            raise EmbeddingError("Set RAG_EMBEDDING_API_KEY or RAG_LLM_API_KEY before indexing")
         # Prepare all vectors before publishing: provider failure leaves the old snapshot active.
         with self.connect(create=True) as db:
             existing = {row["version_id"] for row in db.execute("SELECT version_id FROM documents")}
@@ -124,7 +126,7 @@ class PgVectorStore:
                     cursor.executemany("""
                         INSERT INTO chunks(version_id, chunk_id, text, page_number, start_char,
                             end_char, extraction_method, embedding)
-                        VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s::vector)
+                        VALUES(%s, %s, %s, %s, %s, %s, %s, %s::vector)
                     """, [(version, chunk.chunk_id, chunk.text, chunk.page_number, chunk.start_char,
                            chunk.end_char, chunk.extraction_method, vector)
                           for chunk, vector in zip(chunks, prepared[version])])
