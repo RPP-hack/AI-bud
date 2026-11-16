@@ -87,7 +87,7 @@ class PgVectorStore:
     def ready(self):
         if not self.embedder.config.api_key:
             return False
-        with self.connect(read_only=True) as db:
+        with self.connect(read_only=True, timeout_seconds=2) as db:
             spaces = db.execute("SELECT DISTINCT embedding_space FROM documents WHERE current").fetchall()
             return (spaces == [{"embedding_space": self.embedding_identity}]
                     and db.execute("SELECT 1 FROM chunks c JOIN documents d USING(version_id) "
