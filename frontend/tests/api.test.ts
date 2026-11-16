@@ -3,12 +3,37 @@ import { Api, ApiError, errorText } from "../src/api";
 import { request } from "./fixtures";
 
 describe("explicit same-origin API client", () => {
+  it("keeps the browser receiver when using the native fetch default", async () => {
+    const browserFetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            id: "intern-platform",
+            role: "intern",
+            team: "platform",
+            status: "ready",
+          }),
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", browserFetch);
+    try {
+      const api = new Api("demo-intern-platform");
+      expect(await api.me()).toMatchObject({ id: "intern-platform" });
+      expect(await api.health()).toMatchObject({ status: "ready" });
+      expect(await api.ready()).toMatchObject({ status: "ready" });
+      expect(browserFetch).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("uses every public REST operation with exact methods, versions and delegated auth", async () => {
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(new Response("{}", { status: 200 }));
     // A fresh Response is needed for each call, as its body can only be read once.
-    fetcher.mockImplementation(async () => new Response("{}", { status: 200 }));
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockImplementation(async () => new Response("{}", { status: 200 }));
     const api = new Api("demo-intern-platform", fetcher);
     await api.me();
     await api.answer("Jira 403", "llm", 3);
@@ -25,7 +50,7 @@ describe("explicit same-origin API client", () => {
     await api.progress();
     await api.health();
     await api.ready();
-    expect(fetcher.mock.calls.map((c) => [c[0], c[1].method])).toEqual([
+    expect(fetcher.mock.calls.map(([url, options]) => [url, options?.method])).toEqual([
       ["/api/me", "GET"],
       ["/api/rag/answers", "POST"],
       ["/api/rag/search", "POST"],
@@ -39,20 +64,20 @@ describe("explicit same-origin API client", () => {
       ["/health", "GET"],
       ["/ready", "GET"],
     ]);
-    expect(fetcher.mock.calls[1][1].body).toBe(
+    expect(fetcher.mock.calls[1][1]?.body).toBe(
       JSON.stringify({ question: "Jira 403", mode: "llm", top_k: 3 }),
     );
-    expect(fetcher.mock.calls[2][1].body).toBe(
+    expect(fetcher.mock.calls[2][1]?.body).toBe(
       JSON.stringify({ query: "Jira", top_k: 1 }),
     );
-    expect(fetcher.mock.calls[5][1].headers["Idempotency-Key"]).toBe(
+    expect(new Headers(fetcher.mock.calls[5][1]?.headers).get("Idempotency-Key")).toBe(
       "stable-key",
     );
-    expect(fetcher.mock.calls[6][1].body).toBe('{"version":1}');
-    expect(fetcher.mock.calls[8][1].body).toBeUndefined();
+    expect(fetcher.mock.calls[6][1]?.body).toBe('{"version":1}');
+    expect(fetcher.mock.calls[8][1]?.body).toBeUndefined();
     for (const [, options] of fetcher.mock.calls) {
-      expect(options.headers.Authorization).toBe("Bearer demo-intern-platform");
-      expect(options.cache).toBe("no-store");
+      expect(new Headers(options?.headers).get("Authorization")).toBe("Bearer demo-intern-platform");
+      expect(options?.cache).toBe("no-store");
     }
   });
   it("accepts 202 unknown state and maps sanitized HTTP, network and protocol failures", async () => {

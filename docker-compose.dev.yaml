@@ -39,25 +39,39 @@ services:
       - "127.0.0.1:8080:8080"
 
   rag-index:
+    pull_policy: build
     build:
       context: ./rag
       target: server
     entrypoint: ["python", "-m", "rag"]
     command: ["index"]
-    env_file:
+    env_file: &rag-env
       - ./rag/.env.compose.example
+      - path: ./rag/.env
+        required: false
+    environment: &rag-storage
+      RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
+      HF_HOME: /models
     volumes:
-      - rag-data:/data
+      - rag-models:/models
+    depends_on:
+      rag-db:
+        condition: service_healthy
 
   rag:
+    pull_policy: build
     build:
       context: ./rag
       target: server
-    env_file:
-      - ./rag/.env.compose.example
+    env_file: *rag-env
+    environment:
+      <<: *rag-storage
+      HF_HUB_OFFLINE: "1"
     volumes:
-      - rag-data:/data:ro
+      - rag-models:/models
     depends_on:
+      rag-db:
+        condition: service_healthy
       rag-index:
         condition: service_completed_successfully
     healthcheck:
@@ -65,6 +79,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 120s
    
   frontend-build:
     image: node:22-alpine
@@ -84,7 +99,6 @@ services:
       - ./gateway:/etc/caddy
       - ./frontend:/var/www/html
   rag-db:
-    profiles: ["rag"]
     image: pgvector/pgvector:0.8.1-pg17
     environment:
       POSTGRES_USER: buddy
@@ -99,24 +113,22 @@ services:
       interval: 2s
       timeout: 3s
       retries: 20
-  rag:
+  rag-cli:
+    pull_policy: build
     profiles: ["rag"]
     build:
       context: ./rag
       target: demo
-    environment:
-      RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
-      RAG_EMBEDDING_API_KEY: "${RAG_EMBEDDING_API_KEY:-${RAG_LLM_API_KEY:-}}"
-      RAG_EMBEDDING_BASE_URL: "${RAG_EMBEDDING_BASE_URL:-https://openrouter.ai/api/v1}"
-      RAG_EMBEDDING_MODEL: "${RAG_EMBEDDING_MODEL:-openai/text-embedding-3-small}"
-      RAG_EMBEDDING_DIMENSIONS: "${RAG_EMBEDDING_DIMENSIONS:-1536}"
-      RAG_MIN_SIMILARITY: "${RAG_MIN_SIMILARITY:-0.3}"
-      RAG_LLM_API_KEY: "${RAG_LLM_API_KEY:-}"
-      RAG_LLM_BASE_URL: "${RAG_LLM_BASE_URL:-https://openrouter.ai/api/v1}"
-      RAG_LLM_MODEL: "${RAG_LLM_MODEL:-openai/gpt-4o-mini}"
+    env_file: *rag-env
+    environment: *rag-storage
+    volumes:
+      - rag-models:/models
     depends_on:
       rag-db:
         condition: service_healthy
 
 volumes:
+  buddy-db:
+  frontend-node-modules:
   rag-db:
+  rag-models:

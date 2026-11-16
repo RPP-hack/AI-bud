@@ -17,6 +17,9 @@ def main():
     logging.basicConfig(level=logging.INFO)
     token = service_token()
     application = RagApplication()
+    warmup = getattr(getattr(application.store, "embedder", None), "warmup", None)
+    if warmup is not None:
+        warmup()
     server, executor, _ = create_server(application, token, os.environ.get("RAG_GRPC_ADDR", "127.0.0.1:50051"))
     def stop():
         server.stop(grace=30).wait()

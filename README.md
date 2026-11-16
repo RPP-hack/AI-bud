@@ -26,12 +26,24 @@ Gateway Caddy обслуживает статическую сборку и пр
 [`localhost:8080`](http://localhost:8080), а RAG индексируется автоматически
 перед запуском сервера.
 
+Для RAG включена `pull_policy: build`: при `docker compose up` образы индексатора
+и сервера собираются из текущего кода с использованием кэша сборки. Это исключает
+запуск старого индексатора после смены реализации эмбеддингов. Команда `start`
+только запускает ранее созданные контейнеры; после обновления кода используйте `up`.
+
 Переменные контейнеров передаются через
 [`backend/.env.compose.example`](backend/.env.compose.example) и
 [`rag/.env.compose.example`](rag/.env.compose.example) с помощью `env_file` в
 [`docker-compose.dev.yaml`](docker-compose.dev.yaml).
 Внутри Compose используются имена сервисов `db`, `mock-access` и `rag`, а не
 `localhost`.
+
+Поиск использует локальную `BAAI/bge-m3` (1024 измерения) и не требует API-ключа.
+При первом запуске индексатор скачивает веса модели (около 2.3 ГБ) в общий том
+`rag-models`; сервер загружает их из кэша до прохождения healthcheck.
+Настройки можно переопределить в `rag/.env`, созданном из `rag/.env.example`:
+файл одинаково применяется к `rag-index`, `rag` и `rag-cli`.
+Ключ `RAG_LLM_API_KEY` нужен для генерации через внешнюю LLM в режиме `llm`.
 
 Остановка:
 
@@ -43,12 +55,12 @@ docker compose -f docker-compose.dev.yaml down
 
 ## Сценарий стажёра
 
-Для локального запуска нужны Python 3.11+, PostgreSQL с pgvector и ключ embedding API. Скопируйте `rag/.env.example` в `rag/.env` и заполните `RAG_EMBEDDING_API_KEY` (или `RAG_LLM_API_KEY`). Из корня репозитория:
+Для локального запуска нужны Python 3.11+, PostgreSQL с pgvector и зависимости локальной модели. Скопируйте `rag/.env.example` в `rag/.env`. Из корня репозитория:
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install -e ./rag
+python3 -m pip install -e './rag[local]'
 set -a
 . ./rag/.env
 set +a

@@ -6,12 +6,12 @@ REST и gRPC сервер, подключение к Go и примеры зап
 
 ## Запуск за минуту
 
-Команды ниже выполняются из корня репозитория. Нужны Python 3.11+, PostgreSQL 17 с pgvector 0.8+ и ключ OpenRouter для embeddings. Скопируйте `rag/.env.example` в `rag/.env` и заполните `RAG_EMBEDDING_API_KEY` (или `RAG_LLM_API_KEY`). Переменные окружения для CLI загружаются явно.
+Команды ниже выполняются из корня репозитория. Нужны Python 3.11+, PostgreSQL 17 с pgvector 0.8+ и зависимости локальной модели. По умолчанию embeddings вычисляет `BAAI/bge-m3` на CPU без API-ключа. Скопируйте `rag/.env.example` в `rag/.env`; переменные окружения для CLI загружаются явно.
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python3 -m pip install -e ./rag
+python3 -m pip install -e './rag[local]'
 set -a
 . ./rag/.env
 set +a
@@ -38,31 +38,36 @@ python3 -m rag.evaluation run --output rag/evals/reports/offline.json
 ## Docker
 
 ```sh
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --build --rm rag index
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag ask 'Не открывается Jira, ошибка 403' --offline
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag access
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag access --confirm
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --build --rm rag-cli index
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli ask 'Не открывается Jira, ошибка 403' --offline
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli access
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli access --confirm
 ```
 
 Том PostgreSQL хранит документы, фрагменты, векторы и тестовые заявки. Для полного стека выполните `docker compose -f backend/compose.yaml --env-file rag/.env up --build`: индексатор дождётся БД, а сервер — завершения индексации. Внутри БД RAG использует отдельную схему `rag`, не затрагивая таблицы Go API. При локальном запуске подключение задаёт `RAG_DATABASE_URL`, по умолчанию `postgresql://buddy:buddy-local@localhost:55432/buddy`. Для переноса прежней базы SQLite повторно выполните `python3 -m rag index` с исходным манифестом.
 
 ## Семантический поиск
 
-Путь индексации: документ → существующий chunking по абзацам и предложениям (до 1400 символов, перекрытие 160) → embedding заголовка и текста каждого фрагмента → `vector(1536)` в pgvector. По умолчанию используется `openai/text-embedding-3-small` через OpenAI-совместимый `/embeddings`. Векторы нормализуются; поиск использует косинусное расстояние `<=>` и индекс HNSW. Фильтры роли, команды и текущей версии применяются в SQL до `LIMIT`. Вопрос векторизуется целиком, без словаря синонимов. Существующий system prompt сохранён.
+Документы разбиваются существующим chunking по абзацам и предложениям (до 1400 символов, перекрытие 160). Локальная `BAAI/bge-m3` преобразует заголовок и текст каждого фрагмента в один плотный вектор из 1024 чисел. Используется dense-выход через Sentence Transformers, L2-нормализация, косинусное расстояние `<=>` и HNSW в pgvector. Вопрос передаётся целиком; префикс-инструкции BGE-M3 не требуются. [Карточка модели](https://huggingface.co/BAAI/bge-m3)
 
-Вызовы embeddings идут пакетами по 32 фрагмента. Повторная индексация неизменившихся версий использует сохранённые векторы. Новый снимок публикуется одной транзакцией после успешного получения всех embeddings: ошибка загрузки, провайдера или БД сохраняет предыдущий снимок. Метаданные, страницы и точные диапазоны цитат хранятся рядом с текстом, а не внутри вектора.
+Модель загружается один раз на процесс. Индексация идёт пакетами по 4 фрагмента; вызовы модели сериализуются, чтобы параллельные запросы не создавали несколько копий весов. Первый запуск скачивает около 2.3 ГБ весов с Hugging Face, затем использует кэш. В Docker общий том `rag-models` подключён к индексатору, серверу и CLI. Сервер прогревает модель перед запуском REST/gRPC и использует `HF_HUB_OFFLINE=1`, поэтому повторно скачивать веса при старте сервера не требуется. Docker устанавливает CPU-версию PyTorch. На CPU задержка зависит от оборудования; для Docker разумно выделить около 8 ГБ RAM на весь стек.
 
-| Переменная | Назначение / значение по умолчанию |
+Фильтры роли, команды, текущей версии, embedding-пространства и размерности применяются в SQL до `LIMIT`. Метаданные, страницы и точные диапазоны цитат сохраняются рядом с текстом. Неизменённые версии используют сохранённые векторы. Новый снимок публикуется одной транзакцией после успешного вычисления всех embeddings. Существующий system prompt сохранён.
+
+| Переменная | Значение по умолчанию / назначение |
 |---|---|
-| `RAG_EMBEDDING_API_KEY` | Ключ embedding API; при пустом значении используется `RAG_LLM_API_KEY`. |
-| `RAG_EMBEDDING_BASE_URL` | `https://openrouter.ai/api/v1`; задаётся независимо от chat API. |
-| `RAG_EMBEDDING_MODEL` | `openai/text-embedding-3-small`. |
-| `RAG_EMBEDDING_DIMENSIONS` | `1536`; допустимо 1–2000 при поддержке выбранной моделью. |
-| `RAG_MIN_SIMILARITY` | Начальный порог cosine similarity `0.3`; требует настройки по реальным вопросам, включая вопросы без ответа в базе. |
+| `RAG_EMBEDDING_MODEL` | `BAAI/bge-m3`. |
+| `RAG_EMBEDDING_DIMENSIONS` | `1024`; BGE-M3 требует именно эту размерность. |
+| `RAG_EMBEDDING_REVISION` | Закреплённая ревизия `5617a9f61b028005a4858fdac845db406aefb181`; входит в идентификатор пространства. |
+| `RAG_EMBEDDING_DEVICE` | `cpu`; вне CPU Docker-образа можно указать доступное устройство `mps` или `cuda`. |
+| `RAG_EMBEDDING_BATCH_SIZE` | `4`; уменьшите при нехватке RAM. |
+| `RAG_EMBEDDING_CACHE_DIR` | Необязательный каталог кэша Sentence Transformers; Docker использует `HF_HOME=/models`. |
+| `RAG_MIN_SIMILARITY` | Начальный порог `0.3`; требуется настройка по реальным вопросам и вопросам без ответа в базе. |
 
-Смена модели или endpoint требует переиндексации: идентификатор embedding-пространства включён в версию документа, несовместимые векторы не смешиваются. При смене размерности создайте новую БД и укажите её в `RAG_DATABASE_URL` перед индексацией. Прямой OpenAI API также поддерживается: укажите `https://api.openai.com/v1`, модель `text-embedding-3-small` и соответствующий ключ.
+После перехода со старой embedding-модели выполните `python3 -m rag index` или пересоздайте `rag-index` в Compose. При первой индексации схема автоматически переходит с фиксированного `vector(1536)` на `vector` с отдельным частичным HNSW-индексом для каждой размерности. Старые векторы и версии сохраняются; поиск использует только текущее пространство. Снимок переключится на BGE-M3 после успешной переиндексации. Смена модели, размерности или ревизии требует повторной индексации.
 
-Предложение `preview_jira_access` определяется актуальной инструкцией `jira.bud.read`, занимающей первое место в поиске и присутствующей в источниках ответа. Подтверждение и проверка права на саму заявку остаются отдельным действием. SQLite-адаптер доступен только при явном создании `SQLiteStore` в тестах; CLI и сервер по умолчанию используют PostgreSQL.
+
+Предложение `preview_jira_access` определяется актуальной инструкцией `jira.bud.read`, занимающей первое место в поиске и присутствующей в источниках ответа. Подтверждение заявки остаётся отдельным действием. SQLite-адаптер используется только при явном создании `SQLiteStore` в тестах; CLI и сервер по умолчанию используют PostgreSQL.
 
 ## Работа с моделью
 
@@ -73,10 +78,10 @@ set -a
 . ./rag/.env
 set +a
 python3 -m rag ask 'Как скачать репозиторий?'
-docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag ask 'Как скачать репозиторий?'
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli ask 'Как скачать репозиторий?'
 ```
 
-Команда `ask` без chat-ключа или с `--offline` явно помечает режим и показывает выдержку. Поиск всё равно требует embedding API и PostgreSQL. С chat-ключом выполняется один запрос к генеративной модели с проверкой структуры ответа и идентификаторов цитат. Ошибка провайдера отображается как ошибка, повтор возможен по запросу. Известный конфликт, просроченный единственный источник и отсутствие результатов обрабатываются локально.
+Команда `ask` без chat-ключа или с `--offline` явно помечает режим и показывает выдержку. Поиск использует локальную embedding-модель и PostgreSQL; API-ключ ему не нужен. С chat-ключом выполняется один запрос к генеративной модели с проверкой структуры ответа и идентификаторов цитат. Ошибка провайдера отображается как ошибка, повтор возможен по запросу. Известный конфликт, просроченный единственный источник и отсутствие результатов обрабатываются локально.
 
 ## База знаний
 
@@ -92,7 +97,7 @@ docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run 
 | `source_url`, `review_by` | Необязательная исходная ссылка и последний день действия проверки в формате YYYY-MM-DD. Пропущенная дата означает, что срок не задан. |
 | `rule_key`, `rule_value` | Необязательная пара для сравнения вариантов одного правила. Значение должно передавать смысл цитируемой инструкции. |
 
-Поддерживаются UTF-8 TXT и Markdown. Для PDF установите `python3 -m pip install -e './rag[pdf]'`. Сканированные страницы дополнительно требуют Tesseract 5 с языками `rus` и `eng`. В Docker этот вариант собирается через `docker build --target pdf -t ai-buddy-rag:pdf ./rag`. Параметр `index --no-ocr` ограничивает извлечение текстовым слоем PDF. Цитата хранит версию, фрагмент, страницу и диапазон символов в извлечённом тексте.
+Поддерживаются UTF-8 TXT и Markdown. Для PDF установите `python3 -m pip install -e './rag[pdf,local]'`. Сканированные страницы дополнительно требуют Tesseract 5 с языками `rus` и `eng`. В Docker этот вариант собирается через `docker build --target pdf -t ai-buddy-rag:pdf ./rag`. Параметр `index --no-ocr` ограничивает извлечение текстовым слоем PDF. Цитата хранит версию, фрагмент, страницу и диапазон символов в извлечённом тексте.
 
 ## Вызов из Python
 
@@ -117,7 +122,7 @@ python3 -m coverage report
 python3 -m coverage xml -o docs/coverage.xml
 ```
 
-Для интеграционных тестов установите базовые зависимости и задайте `RAG_TEST_DATABASE_URL` — DSN PostgreSQL с pgvector и правом `CREATEDB`. Каждый тест создаёт отдельную временную БД и удаляет только её; внешняя embedding API заменена фиксированными векторами, чтобы проверять SQL, фильтры, транзакции и версии без сетевых расходов:
+Для интеграционных тестов установите базовые зависимости и задайте `RAG_TEST_DATABASE_URL` — DSN PostgreSQL с pgvector и правом `CREATEDB`. Каждый тест создаёт отдельную временную БД и удаляет только её; embedding-модель заменена фиксированными векторами, чтобы проверять SQL, фильтры, транзакции и версии без сетевых расходов:
 
 ```sh
 RAG_TEST_DATABASE_URL=postgresql://buddy:buddy-local@localhost:55432/buddy \

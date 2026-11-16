@@ -98,7 +98,7 @@ export const errorText = (error: unknown): string => {
 export class Api {
   constructor(
     private token: string,
-    private fetcher: typeof fetch = fetch,
+    private fetcher: typeof fetch = globalThis.fetch.bind(globalThis),
   ) {}
   private async request<T>(
     path: string,

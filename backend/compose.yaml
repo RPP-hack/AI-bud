@@ -1,9 +1,11 @@
 x-rag-storage: &rag-storage
   RAG_DATABASE_URL: postgresql://buddy:buddy-local@db:5432/buddy
-  RAG_EMBEDDING_API_KEY: ${RAG_EMBEDDING_API_KEY:-${RAG_LLM_API_KEY:-}}
-  RAG_EMBEDDING_BASE_URL: ${RAG_EMBEDDING_BASE_URL:-https://openrouter.ai/api/v1}
-  RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-openai/text-embedding-3-small}
-  RAG_EMBEDDING_DIMENSIONS: ${RAG_EMBEDDING_DIMENSIONS:-1536}
+  RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-BAAI/bge-m3}
+  RAG_EMBEDDING_DIMENSIONS: ${RAG_EMBEDDING_DIMENSIONS:-1024}
+  RAG_EMBEDDING_DEVICE: ${RAG_EMBEDDING_DEVICE:-cpu}
+  RAG_EMBEDDING_BATCH_SIZE: ${RAG_EMBEDDING_BATCH_SIZE:-4}
+  RAG_EMBEDDING_REVISION: ${RAG_EMBEDDING_REVISION:-5617a9f61b028005a4858fdac845db406aefb181}
+  HF_HOME: /models
   RAG_MIN_SIMILARITY: ${RAG_MIN_SIMILARITY:-0.3}
 
 services:
@@ -55,21 +57,26 @@ services:
       rag:
         condition: service_healthy
   rag-index:
+    pull_policy: build
     build:
       context: ../rag
       target: server
     entrypoint: ["python", "-m", "rag"]
     command: ["index"]
     environment: *rag-storage
+    volumes:
+      - rag-models:/models
     depends_on:
       db:
         condition: service_healthy
   rag:
+    pull_policy: build
     build:
       context: ../rag
       target: server
     environment:
       <<: *rag-storage
+      HF_HUB_OFFLINE: "1"
       RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-local-rag-token}
       RAG_HTTP_HOST: 0.0.0.0
       RAG_GRPC_ADDR: 0.0.0.0:50051
@@ -79,6 +86,8 @@ services:
     ports:
       - "127.0.0.1:8001:8001"
       - "127.0.0.1:50051:50051"
+    volumes:
+      - rag-models:/models
     depends_on:
       db:
         condition: service_healthy
@@ -89,5 +98,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 120s
 volumes:
   buddy-db:
+  rag-models:
