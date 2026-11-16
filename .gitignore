@@ -4,8 +4,13 @@ __pycache__/
 *.py[cod]
 *.sqlite3*
 .env
+.env.compose
 *.egg-info/
 /rag/build/
 /rag/dist/
 /rag/evals/reports/
 .idea
+/frontend/node_modules/
+/frontend/dist/
+/frontend/coverage/
+/frontend/*.tsbuildinfo
