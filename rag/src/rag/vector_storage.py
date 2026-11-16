@@ -6,7 +6,7 @@ import math
 import os
 import time
 
-from .embeddings import EmbeddingError, create_embedder, normalize_vector
+from .embeddings import create_embedder, normalize_vector
 from .storage import StorageError, _COLUMNS
 
 
