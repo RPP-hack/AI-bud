@@ -10,11 +10,13 @@ REST-сценарии и запуск описаны в [RAG API](../docs/rag-ap
 
 ## Быстрый запуск
 
-Нужен работающий Docker Desktop с Docker Compose. Из корня репозитория:
+Нужен работающий Docker Desktop с Docker Compose. Скопируйте `rag/.env.example`
+в `rag/.env` и заполните `RAG_EMBEDDING_API_KEY` (или `RAG_LLM_API_KEY`):
+он нужен индексатору и семантическому поиску. Из корня репозитория:
 
 ```sh
 cd backend
-docker compose up --build -d
+docker compose --env-file ../rag/.env up --build -d
 docker compose ps
 curl http://localhost:8080/ready
 ```

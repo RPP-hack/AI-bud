@@ -1,6 +1,14 @@
+x-rag-storage: &rag-storage
+  RAG_DATABASE_URL: postgresql://buddy:buddy-local@db:5432/buddy
+  RAG_EMBEDDING_API_KEY: ${RAG_EMBEDDING_API_KEY:-${RAG_LLM_API_KEY:-}}
+  RAG_EMBEDDING_BASE_URL: ${RAG_EMBEDDING_BASE_URL:-https://openrouter.ai/api/v1}
+  RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-openai/text-embedding-3-small}
+  RAG_EMBEDDING_DIMENSIONS: ${RAG_EMBEDDING_DIMENSIONS:-1536}
+  RAG_MIN_SIMILARITY: ${RAG_MIN_SIMILARITY:-0.3}
+
 services:
   db:
-    image: postgres:17.6-alpine
+    image: pgvector/pgvector:0.8.1-pg17
     environment:
       POSTGRES_USER: buddy
       POSTGRES_PASSWORD: buddy-local
@@ -52,13 +60,16 @@ services:
       target: server
     entrypoint: ["python", "-m", "rag"]
     command: ["index"]
-    volumes:
-      - rag-data:/data
+    environment: *rag-storage
+    depends_on:
+      db:
+        condition: service_healthy
   rag:
     build:
       context: ../rag
       target: server
     environment:
+      <<: *rag-storage
       RAG_SERVICE_TOKEN: ${RAG_SERVICE_TOKEN:-local-rag-token}
       RAG_HTTP_HOST: 0.0.0.0
       RAG_GRPC_ADDR: 0.0.0.0:50051
@@ -68,9 +79,9 @@ services:
     ports:
       - "127.0.0.1:8001:8001"
       - "127.0.0.1:50051:50051"
-    volumes:
-      - rag-data:/data:ro
     depends_on:
+      db:
+        condition: service_healthy
       rag-index:
         condition: service_completed_successfully
     healthcheck:
@@ -80,4 +91,3 @@ services:
       retries: 10
 volumes:
   buddy-db:
-  rag-data:

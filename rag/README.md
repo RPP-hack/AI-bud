@@ -6,12 +6,16 @@ REST и gRPC сервер, подключение к Go и примеры зап
 
 ## Запуск за минуту
 
-Команды ниже выполняются из корня репозитория. Подойдёт Python 3.11+ с SQLite FTS5 и JSON. Создайте виртуальное окружение и установите пакет из каталога `rag/`. Для работы с учебными Markdown-документами достаточно базовой установки.
+Команды ниже выполняются из корня репозитория. Нужны Python 3.11+, PostgreSQL 17 с pgvector 0.8+ и ключ OpenRouter для embeddings. Скопируйте `rag/.env.example` в `rag/.env` и заполните `RAG_EMBEDDING_API_KEY` (или `RAG_LLM_API_KEY`). Переменные окружения для CLI загружаются явно.
 
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
 python3 -m pip install -e ./rag
+set -a
+. ./rag/.env
+set +a
+docker compose -f docker-compose.dev.yaml --profile rag up -d rag-db
 python3 -m rag index
 python3 -m rag ask 'Не открывается Jira, ошибка 403' --offline
 python3 -m rag access
@@ -25,7 +29,7 @@ python3 -m rag access
 
 Размеченные вопросы, автоматические метрики и проверка реальной модели описаны в [evals](evals/README.md). Границы защиты и ограничения детекторов — в [guardrails](../docs/rag-guardrails.md).
 
-Офлайн-прогон качества создаёт временный индекс и не требует API-ключа:
+Офлайн-прогон качества использует прежний SQLite-адаптер как изолированный тестовый стенд и не требует API-ключа. Он проверяет старые сценарии и guardrails, но не качество нового семантического поиска:
 
 ```sh
 python3 -m rag.evaluation run --output rag/evals/reports/offline.json
@@ -34,35 +38,51 @@ python3 -m rag.evaluation run --output rag/evals/reports/offline.json
 ## Docker
 
 ```sh
-docker build -t ai-buddy-rag ./rag
-docker volume create ai-buddy-data
-docker run --rm -v ai-buddy-data:/data ai-buddy-rag index
-docker run --rm -v ai-buddy-data:/data ai-buddy-rag ask 'Не открывается Jira, ошибка 403' --offline
-docker run --rm -v ai-buddy-data:/data ai-buddy-rag access
-docker run --rm -v ai-buddy-data:/data ai-buddy-rag access --confirm
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --build --rm rag index
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag ask 'Не открывается Jira, ошибка 403' --offline
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag access
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag access --confirm
 ```
 
-Том хранит индекс и тестовые заявки. При запуске без Docker путь задаёт `RAG_DB_PATH`, по умолчанию используется `./ai-buddy.sqlite3`.
+Том PostgreSQL хранит документы, фрагменты, векторы и тестовые заявки. Для полного стека выполните `docker compose -f backend/compose.yaml --env-file rag/.env up --build`: индексатор дождётся БД, а сервер — завершения индексации. Внутри БД RAG использует отдельную схему `rag`, не затрагивая таблицы Go API. При локальном запуске подключение задаёт `RAG_DATABASE_URL`, по умолчанию `postgresql://buddy:buddy-local@localhost:55432/buddy`. Для переноса прежней базы SQLite повторно выполните `python3 -m rag index` с исходным манифестом.
+
+## Семантический поиск
+
+Путь индексации: документ → существующий chunking по абзацам и предложениям (до 1400 символов, перекрытие 160) → embedding заголовка и текста каждого фрагмента → `vector(1536)` в pgvector. По умолчанию используется `openai/text-embedding-3-small` через OpenAI-совместимый `/embeddings`. Векторы нормализуются; поиск использует косинусное расстояние `<=>` и индекс HNSW. Фильтры роли, команды и текущей версии применяются в SQL до `LIMIT`. Вопрос векторизуется целиком, без словаря синонимов. Существующий system prompt сохранён.
+
+Вызовы embeddings идут пакетами по 32 фрагмента. Повторная индексация неизменившихся версий использует сохранённые векторы. Новый снимок публикуется одной транзакцией после успешного получения всех embeddings: ошибка загрузки, провайдера или БД сохраняет предыдущий снимок. Метаданные, страницы и точные диапазоны цитат хранятся рядом с текстом, а не внутри вектора.
+
+| Переменная | Назначение / значение по умолчанию |
+|---|---|
+| `RAG_EMBEDDING_API_KEY` | Ключ embedding API; при пустом значении используется `RAG_LLM_API_KEY`. |
+| `RAG_EMBEDDING_BASE_URL` | `https://openrouter.ai/api/v1`; задаётся независимо от chat API. |
+| `RAG_EMBEDDING_MODEL` | `openai/text-embedding-3-small`. |
+| `RAG_EMBEDDING_DIMENSIONS` | `1536`; допустимо 1–2000 при поддержке выбранной моделью. |
+| `RAG_MIN_SIMILARITY` | Начальный порог cosine similarity `0.3`; требует настройки по реальным вопросам, включая вопросы без ответа в базе. |
+
+Смена модели или endpoint требует переиндексации: идентификатор embedding-пространства включён в версию документа, несовместимые векторы не смешиваются. При смене размерности создайте новую БД и укажите её в `RAG_DATABASE_URL` перед индексацией. Прямой OpenAI API также поддерживается: укажите `https://api.openai.com/v1`, модель `text-embedding-3-small` и соответствующий ключ.
+
+Предложение `preview_jira_access` определяется актуальной инструкцией `jira.bud.read`, занимающей первое место в поиске и присутствующей в источниках ответа. Подтверждение и проверка права на саму заявку остаются отдельным действием. SQLite-адаптер доступен только при явном создании `SQLiteStore` в тестах; CLI и сервер по умолчанию используют PostgreSQL.
 
 ## Работа с моделью
 
-По умолчанию клиент использует OpenRouter, модель `openai/gpt-4o-mini` и OpenAI-совместимый метод `/chat/completions`. Скопируйте `.env.example` в `.env` и укажите свой ключ в `RAG_LLM_API_KEY`. Для другого провайдера измените `RAG_LLM_BASE_URL` и `RAG_LLM_MODEL`. Внешний сервис получит вопрос, роль, команду и отобранные разрешённые фрагменты. [Документация OpenRouter](https://openrouter.ai/docs/quickstart)
+По умолчанию клиент использует OpenRouter, модель `openai/gpt-4o-mini` и OpenAI-совместимый метод `/chat/completions`. Укажите свой ключ в `RAG_LLM_API_KEY`. Для другого провайдера измените `RAG_LLM_BASE_URL` и `RAG_LLM_MODEL`. Внешний сервис получит вопрос, роль, команду и отобранные разрешённые фрагменты. [Документация OpenRouter](https://openrouter.ai/docs/quickstart)
 
 ```sh
 set -a
-. ./.env
+. ./rag/.env
 set +a
 python3 -m rag ask 'Как скачать репозиторий?'
-docker run --rm --env-file .env -v ai-buddy-data:/data ai-buddy-rag ask 'Как скачать репозиторий?'
+docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag ask 'Как скачать репозиторий?'
 ```
 
-Команда `ask` без ключа или с `--offline` явно помечает режим и показывает выдержку. С ключом выполняет один запрос к модели, проверяет структуру ответа и идентификаторы цитат. Ошибка провайдера отображается как ошибка, повтор возможен по запросу. Известный конфликт, просроченный единственный источник и отсутствие результатов обрабатываются локально.
+Команда `ask` без chat-ключа или с `--offline` явно помечает режим и показывает выдержку. Поиск всё равно требует embedding API и PostgreSQL. С chat-ключом выполняется один запрос к генеративной модели с проверкой структуры ответа и идентификаторов цитат. Ошибка провайдера отображается как ошибка, повтор возможен по запросу. Известный конфликт, просроченный единственный источник и отсутствие результатов обрабатываются локально.
 
 ## База знаний
 
 В [rag/knowledge/manifest.json](knowledge/manifest.json) перечислены источники для индекса. Два листа оригинального чек-листа представлены выдержками о первых неделях. Раздел Playbook представлен кратким пересказом с прямой ссылкой. Рабочие процедуры команд, служебные маркеры и проект BUD — синтетические данные, отмеченные как учебные в выдаче. Условия кейса и ответы вебинара использованы при проектировании. [Чек-лист стажёра](https://docs.google.com/spreadsheets/d/1qKFqOzfSZ2jEz57jBSmq7rukDXi_tRfWohgemViceV0/edit) · [Принципы разработки AvitoTech](https://github.com/avito-tech/playbook/blob/master/development-principles.md)
 
-Чтобы подключить свой набор, положите документы рядом с манифестом и выполните `python3 -m rag index path/to/manifest.json`. Манифест целиком задаёт текущий состав базы. Пропущенные в новой версии документы или отозванные права исчезают из поиска после успешной публикации. Для независимого набора укажите другой `RAG_DB_PATH`.
+Чтобы подключить свой набор, положите документы рядом с манифестом и выполните `python3 -m rag index path/to/manifest.json`. Манифест целиком задаёт текущий состав базы. Пропущенные в новой версии документы или отозванные права исчезают из поиска после успешной публикации. Для независимого набора укажите другую БД в `RAG_DATABASE_URL`.
 
 | Поля манифеста | Назначение |
 |---|---|
@@ -95,6 +115,13 @@ python3 -m pip install coverage==6.5.0 -e './rag[pdf]'
 python3 -m coverage run -m unittest discover -s rag/tests
 python3 -m coverage report
 python3 -m coverage xml -o docs/coverage.xml
+```
+
+Для интеграционных тестов установите базовые зависимости и задайте `RAG_TEST_DATABASE_URL` — DSN PostgreSQL с pgvector и правом `CREATEDB`. Каждый тест создаёт отдельную временную БД и удаляет только её; внешняя embedding API заменена фиксированными векторами, чтобы проверять SQL, фильтры, транзакции и версии без сетевых расходов:
+
+```sh
+RAG_TEST_DATABASE_URL=postgresql://buddy:buddy-local@localhost:55432/buddy \
+  python3 -m unittest discover -s rag/tests -p test_vector_storage.py -v
 ```
 
 Для полного прогона теста OCR нужен Tesseract с английским языком. В минимальном окружении дополнительные проверки PDF помечаются как пропущенные. Покрытие считается по всему пакету `rag`, включая CLI и тестовый адаптер заявок. Целевой порог строго выше 80%. [Отчёт Cobertura](../docs/coverage.xml)
