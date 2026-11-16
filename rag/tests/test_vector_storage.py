@@ -83,7 +83,7 @@ class VectorStorageTests(unittest.TestCase):
             store = Mock()
             store.search.side_effect = error
             app = RagApplication(store)
-            with self.subTest(error=type(error)), self.assertRaisesRegex(ApplicationError, "^temporarily_unavailable$"):
+            with self.subTest(error=type(error)), self.assertRaisesRegex(ApplicationError, "^search_unavailable$"):
                 app.answer("Вопрос", Actor("u", "intern", "platform"))
         store.ready.side_effect = StorageError("database details")
         self.assertFalse(RagApplication(store).ready())

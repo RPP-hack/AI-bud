@@ -50,7 +50,9 @@ describe("explicit same-origin API client", () => {
     await api.progress();
     await api.health();
     await api.ready();
-    expect(fetcher.mock.calls.map(([url, options]) => [url, options?.method])).toEqual([
+    expect(
+      fetcher.mock.calls.map(([url, options]) => [url, options?.method]),
+    ).toEqual([
       ["/api/me", "GET"],
       ["/api/rag/answers", "POST"],
       ["/api/rag/search", "POST"],
@@ -70,13 +72,15 @@ describe("explicit same-origin API client", () => {
     expect(fetcher.mock.calls[2][1]?.body).toBe(
       JSON.stringify({ query: "Jira", top_k: 1 }),
     );
-    expect(new Headers(fetcher.mock.calls[5][1]?.headers).get("Idempotency-Key")).toBe(
-      "stable-key",
-    );
+    expect(
+      new Headers(fetcher.mock.calls[5][1]?.headers).get("Idempotency-Key"),
+    ).toBe("stable-key");
     expect(fetcher.mock.calls[6][1]?.body).toBe('{"version":1}');
     expect(fetcher.mock.calls[8][1]?.body).toBeUndefined();
     for (const [, options] of fetcher.mock.calls) {
-      expect(new Headers(options?.headers).get("Authorization")).toBe("Bearer demo-intern-platform");
+      expect(new Headers(options?.headers).get("Authorization")).toBe(
+        "Bearer demo-intern-platform",
+      );
       expect(options?.cache).toBe("no-store");
     }
   });
@@ -102,7 +106,7 @@ describe("explicit same-origin API client", () => {
       new Response("<html lang='en'>bad gateway</html>", { status: 502 }),
     );
     await expect(api.list()).rejects.toMatchObject({
-      code: "invalid_response",
+      code: "temporarily_unavailable",
     });
     fetcher.mockResolvedValue(new Response("null"));
     await expect(api.list()).rejects.toMatchObject({

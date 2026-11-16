@@ -21,6 +21,7 @@ class AnswerStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     ANSWER_STATUS_INSUFFICIENT_EVIDENCE: _ClassVar[AnswerStatus]
     ANSWER_STATUS_CONFLICT: _ClassVar[AnswerStatus]
     ANSWER_STATUS_NEEDS_REVIEW: _ClassVar[AnswerStatus]
+    ANSWER_STATUS_CONVERSATION: _ClassVar[AnswerStatus]
 ANSWER_MODE_UNSPECIFIED: AnswerMode
 ANSWER_MODE_LLM: AnswerMode
 ANSWER_MODE_OFFLINE: AnswerMode
@@ -30,6 +31,7 @@ ANSWER_STATUS_SOURCES_FOUND: AnswerStatus
 ANSWER_STATUS_INSUFFICIENT_EVIDENCE: AnswerStatus
 ANSWER_STATUS_CONFLICT: AnswerStatus
 ANSWER_STATUS_NEEDS_REVIEW: AnswerStatus
+ANSWER_STATUS_CONVERSATION: AnswerStatus
 
 class Actor(_message.Message):
     __slots__ = ("user_id", "role", "team")

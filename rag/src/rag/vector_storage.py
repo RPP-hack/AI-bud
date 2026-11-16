@@ -146,7 +146,7 @@ class PgVectorStore:
                        "ON CONFLICT(id) DO UPDATE SET dimensions = EXCLUDED.dimensions", (self.dimensions,))
 
     def search(self, query, audience, top_k, today, *, timeout_seconds=None):
-        budget = 30 if timeout_seconds is None else timeout_seconds
+        budget = 60 if timeout_seconds is None else timeout_seconds
         deadline = time.monotonic() + budget
         vector = self.embedder.embed([query], timeout_seconds=budget)[0]
         params = dict(team=audience.team, role=audience.role, space=self.embedding_identity,

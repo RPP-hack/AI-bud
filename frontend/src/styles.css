@@ -1442,3 +1442,21 @@ main {
     font-size: 8px;
   }
 }
+
+.demo-profiles {
+  font-size: 12px;
+  color: var(--muted, #667085);
+}
+.demo-profiles summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
+.demo-profiles p {
+  line-height: 1.5;
+}
+.quick-questions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}

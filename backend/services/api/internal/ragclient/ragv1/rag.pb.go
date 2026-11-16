@@ -79,6 +79,7 @@ const (
 	AnswerStatus_ANSWER_STATUS_INSUFFICIENT_EVIDENCE AnswerStatus = 3
 	AnswerStatus_ANSWER_STATUS_CONFLICT              AnswerStatus = 4
 	AnswerStatus_ANSWER_STATUS_NEEDS_REVIEW          AnswerStatus = 5
+	AnswerStatus_ANSWER_STATUS_CONVERSATION          AnswerStatus = 6
 )
 
 // Enum value maps for AnswerStatus.
@@ -90,6 +91,7 @@ var (
 		3: "ANSWER_STATUS_INSUFFICIENT_EVIDENCE",
 		4: "ANSWER_STATUS_CONFLICT",
 		5: "ANSWER_STATUS_NEEDS_REVIEW",
+		6: "ANSWER_STATUS_CONVERSATION",
 	}
 	AnswerStatus_value = map[string]int32{
 		"ANSWER_STATUS_UNSPECIFIED":           0,
@@ -98,6 +100,7 @@ var (
 		"ANSWER_STATUS_INSUFFICIENT_EVIDENCE": 3,
 		"ANSWER_STATUS_CONFLICT":              4,
 		"ANSWER_STATUS_NEEDS_REVIEW":          5,
+		"ANSWER_STATUS_CONVERSATION":          6,
 	}
 )
 
@@ -807,14 +810,15 @@ const file_rag_v1_rag_proto_rawDesc = "" +
 	"AnswerMode\x12\x1b\n" +
 	"\x17ANSWER_MODE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fANSWER_MODE_LLM\x10\x01\x12\x17\n" +
-	"\x13ANSWER_MODE_OFFLINE\x10\x02*\xcf\x01\n" +
+	"\x13ANSWER_MODE_OFFLINE\x10\x02*\xef\x01\n" +
 	"\fAnswerStatus\x12\x1d\n" +
 	"\x19ANSWER_STATUS_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16ANSWER_STATUS_ANSWERED\x10\x01\x12\x1f\n" +
 	"\x1bANSWER_STATUS_SOURCES_FOUND\x10\x02\x12'\n" +
 	"#ANSWER_STATUS_INSUFFICIENT_EVIDENCE\x10\x03\x12\x1a\n" +
 	"\x16ANSWER_STATUS_CONFLICT\x10\x04\x12\x1e\n" +
-	"\x1aANSWER_STATUS_NEEDS_REVIEW\x10\x052\x96\x01\n" +
+	"\x1aANSWER_STATUS_NEEDS_REVIEW\x10\x05\x12\x1e\n" +
+	"\x1aANSWER_STATUS_CONVERSATION\x10\x062\x96\x01\n" +
 	"\n" +
 	"RagService\x12C\n" +
 	"\x06Answer\x12\x1b.aibud.rag.v1.AnswerRequest\x1a\x1c.aibud.rag.v1.AnswerResponse\x12C\n" +

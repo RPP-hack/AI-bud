@@ -46,7 +46,7 @@ class ApplicationTests(unittest.TestCase):
                 self.app.answer(**kwargs)
         missing = RagApplication(SQLiteStore(self.store.path.parent / "missing.db"))
         self.assertFalse(missing.ready())
-        with self.assertRaisesRegex(ApplicationError, "temporarily_unavailable"):
+        with self.assertRaisesRegex(ApplicationError, "search_unavailable"):
             missing.answer("Jira 403", self.actor)
 
     def test_acl_and_business_outcomes(self):
@@ -80,9 +80,9 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(result["status"], "answered")
         self.assertTrue(0 < budgets[0] <= 2)
         with patch.object(Client, "complete", side_effect=GenerationError("private provider details")):
-            with self.assertRaisesRegex(ApplicationError, "^temporarily_unavailable$"):
+            with self.assertRaisesRegex(ApplicationError, "^model_invalid_response$"):
                 app.answer("Jira 403", self.actor, mode="llm")
         with patch.dict("os.environ", {"RAG_LLM_API_KEY": ""}):
-            with self.assertRaisesRegex(ApplicationError, "temporarily_unavailable"):
+            with self.assertRaisesRegex(ApplicationError, "model_unconfigured"):
                 self.app.answer("Jira 403", self.actor, mode="llm")
             self.assertEqual(self.app.answer("no matching evidence", self.actor, mode="llm")["status"], "insufficient_evidence")

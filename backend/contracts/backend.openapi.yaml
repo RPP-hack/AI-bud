@@ -355,7 +355,7 @@ components:
                 properties:
                   code:
                     type: string
-                    enum: [invalid_input, unauthorized, forbidden, not_found, conflict, temporarily_unavailable, internal_error, resource_exhausted, deadline_exceeded, request_cancelled, conversation_full]
+                    enum: [invalid_input, unauthorized, forbidden, not_found, conflict, temporarily_unavailable, internal_error, resource_exhausted, deadline_exceeded, request_cancelled, conversation_full, search_unavailable, model_unconfigured, model_unavailable, model_timeout, model_rate_limited, model_invalid_response, model_incomplete]
   schemas:
     Conversation:
       type: object
@@ -377,7 +377,7 @@ components:
         top_k: {type: integer}
         state: {type: string, enum: [pending, completed, failed]}
         answer: {$ref: '#/components/schemas/RAGAnswer'}
-        error_code: {type: string, enum: [temporarily_unavailable, deadline_exceeded, resource_exhausted, interrupted]}
+        error_code: {type: string, enum: [temporarily_unavailable, deadline_exceeded, resource_exhausted, interrupted, search_unavailable, model_unconfigured, model_unavailable, model_timeout, model_rate_limited, model_invalid_response, model_incomplete]}
         created_at: {type: string, format: date-time}
     RAGSource:
       type: object
@@ -400,7 +400,7 @@ components:
       required: [request_id, status, mode, steps, sources, next_step, model, action]
       properties:
         request_id: {type: string}
-        status: {type: string, enum: [answered, sources_found, insufficient_evidence, conflict, needs_review]}
+        status: {type: string, enum: [answered, sources_found, insufficient_evidence, conflict, needs_review, conversation]}
         mode: {type: string, enum: [llm, offline, rules]}
         steps:
           type: array

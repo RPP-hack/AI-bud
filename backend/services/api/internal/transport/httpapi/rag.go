@@ -67,6 +67,19 @@ func (h *Handler) ragError(w http.ResponseWriter, err error) {
 		writeError(w, 400, "invalid_input")
 		return
 	}
+	if failure := domain.DependencyFailure(status.Convert(err).Message()); failure != domain.ErrUnavailable {
+		code := 503
+		switch status.Code(err) {
+		case codes.DeadlineExceeded:
+			code = 504
+		case codes.ResourceExhausted:
+			code = 429
+		case codes.DataLoss:
+			code = 502
+		}
+		writeError(w, code, failure.Error())
+		return
+	}
 	switch status.Code(err) {
 	case codes.InvalidArgument:
 		writeError(w, 400, "invalid_input")

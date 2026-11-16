@@ -177,7 +177,7 @@ func (r *Repository) Begin(ctx context.Context, actor identity.Actor, id, key st
 		return domain.Turn{}, nil, false, domain.ErrFull
 	}
 	t := domain.Turn{ID: rand.Text(), ClientID: key, Question: input.Question, Mode: input.Mode, TopK: *input.TopK, State: "pending"}
-	err = tx.QueryRow(ctx, "INSERT INTO conversation_turns(id,conversation_id,idempotency_key,input,state,expires_at) VALUES($1,$2,$3,$4,'pending',now()+interval '60 seconds') RETURNING created_at", t.ID, id, key, data).Scan(&t.CreatedAt)
+	err = tx.QueryRow(ctx, "INSERT INTO conversation_turns(id,conversation_id,idempotency_key,input,state,expires_at) VALUES($1,$2,$3,$4,'pending',now()+interval '120 seconds') RETURNING created_at", t.ID, id, key, data).Scan(&t.CreatedAt)
 	if err != nil {
 		return domain.Turn{}, nil, false, err
 	}

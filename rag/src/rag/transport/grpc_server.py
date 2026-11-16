@@ -12,7 +12,8 @@ from .auth import authorized, service_token
 from .mapping import answer_message, source_message
 
 
-CODES = {"invalid_input": grpc.StatusCode.INVALID_ARGUMENT,
+CODES = {"search_unavailable": grpc.StatusCode.UNAVAILABLE, "model_unconfigured": grpc.StatusCode.FAILED_PRECONDITION, "model_unavailable": grpc.StatusCode.UNAVAILABLE, "model_timeout": grpc.StatusCode.DEADLINE_EXCEEDED, "model_rate_limited": grpc.StatusCode.RESOURCE_EXHAUSTED, "model_invalid_response": grpc.StatusCode.DATA_LOSS, "model_incomplete": grpc.StatusCode.DATA_LOSS,
+"invalid_input": grpc.StatusCode.INVALID_ARGUMENT,
          "unauthorized": grpc.StatusCode.UNAUTHENTICATED,
          "resource_exhausted": grpc.StatusCode.RESOURCE_EXHAUSTED,
          "deadline_exceeded": grpc.StatusCode.DEADLINE_EXCEEDED,

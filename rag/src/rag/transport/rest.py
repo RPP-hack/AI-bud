@@ -68,7 +68,7 @@ class StepOutput(BaseModel):
 
 class AnswerOutput(BaseModel):
     request_id: str
-    status: Literal["answered", "sources_found", "insufficient_evidence", "conflict", "needs_review"]
+    status: Literal["answered", "sources_found", "insufficient_evidence", "conflict", "needs_review", "conversation"]
     mode: Literal["llm", "offline", "rules"]
     steps: list[StepOutput]
     sources: dict[str, SourceOutput]
@@ -82,7 +82,8 @@ class SearchOutput(BaseModel):
     sources: list[SourceOutput]
 
 
-HTTP_CODES = {"invalid_input": 400, "unauthorized": 401, "resource_exhausted": 429,
+HTTP_CODES = {"search_unavailable": 503, "model_unconfigured": 503, "model_unavailable": 503, "model_timeout": 504, "model_rate_limited": 429, "model_invalid_response": 502, "model_incomplete": 502,
+"invalid_input": 400, "unauthorized": 401, "resource_exhausted": 429,
               "deadline_exceeded": 504, "temporarily_unavailable": 503}
 
 

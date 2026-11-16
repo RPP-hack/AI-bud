@@ -24,7 +24,8 @@ export type Answer = {
     | "sources_found"
     | "insufficient_evidence"
     | "conflict"
-    | "needs_review";
+    | "needs_review"
+    | "conversation";
   mode: "llm" | "offline" | "rules";
   steps: { text: string; source_ids: string[] }[];
   sources: Record<string, Source>;
@@ -92,7 +93,21 @@ export const errorText = (error: unknown): string => {
         conflict:
           "Заявка уже изменилась. Обновите её и проверьте текущее состояние.",
         temporarily_unavailable:
-          "Сервис временно недоступен. Попробуйте ещё раз позже.",
+          "Сервис временно недоступен или ещё запускается. Подождите немного и повторите подключение.",
+        search_unavailable:
+          "Не удалось выполнить поиск по инструкциям. Повторите запрос позже.",
+        model_unconfigured:
+          "Модель не подключена: проверьте настройки API-ключа на сервере. Можно найти инструкцию без модели.",
+        model_unavailable:
+          "Внешняя модель сейчас недоступна. Повторите запрос или найдите инструкцию без модели.",
+        model_timeout:
+          "Модель не успела ответить. Повторите запрос или найдите инструкцию без модели.",
+        model_rate_limited:
+          "Провайдер модели ограничил число запросов. Подождите или найдите инструкцию без модели.",
+        model_invalid_response:
+          "Модель вернула ответ в неподходящем формате. Повторите запрос или найдите инструкцию без модели.",
+        model_incomplete:
+          "Модель не закончила ответ. Повторите запрос или найдите инструкцию без модели.",
         resource_exhausted:
           "Помощник занят. Подождите немного перед повторной попыткой.",
         deadline_exceeded:
@@ -152,7 +167,13 @@ export class Api {
     try {
       data = await response.json();
     } catch {
-      throw new ApiError("invalid_response", response.status);
+      const code =
+        response.status === 504
+          ? "deadline_exceeded"
+          : [502, 503].includes(response.status)
+            ? "temporarily_unavailable"
+            : "invalid_response";
+      throw new ApiError(code, response.status);
     }
     if (!response.ok)
       throw new ApiError(
@@ -274,10 +295,22 @@ export class Api {
       signal,
     );
   }
-  health() {
-    return this.request<{ status: string }>("/health");
+  health(signal?: AbortSignal) {
+    return this.request<{ status: string }>(
+      "/health",
+      "GET",
+      undefined,
+      undefined,
+      signal,
+    );
   }
-  ready() {
-    return this.request<{ status: string }>("/ready");
+  ready(signal?: AbortSignal) {
+    return this.request<{ status: string }>(
+      "/ready",
+      "GET",
+      undefined,
+      undefined,
+      signal,
+    );
   }
 }

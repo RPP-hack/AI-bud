@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,6 +37,12 @@ func (s *testServer) Answer(ctx context.Context, in *pb.AnswerRequest) (*pb.Answ
 	}
 	if in.Mode != pb.AnswerMode_ANSWER_MODE_OFFLINE || in.RequestId == "" {
 		s.t.Error(in)
+	}
+	if strings.HasPrefix(in.Question, "model_") || in.Question == "search_unavailable" {
+		return nil, status.Error(codes.Unavailable, in.Question)
+	}
+	if in.Question == "greeting" {
+		return &pb.AnswerResponse{Status: pb.AnswerStatus_ANSWER_STATUS_CONVERSATION, Mode: "rules"}, nil
 	}
 	if in.Question == "fail" {
 		return nil, status.Error(codes.Unavailable, "private details")
@@ -112,6 +119,14 @@ func TestClientContextAndResponseMapping(t *testing.T) {
 		if _, err := c.Search(context.Background(), a, Input{Question: question}); status.Code(err) != code {
 			t.Fatal(question, err)
 		}
+	}
+	for _, code := range []string{"model_timeout", "model_rate_limited", "model_incomplete", "search_unavailable"} {
+		if _, err := c.Generate(context.Background(), a, Input{Question: code}); err == nil || err.Error() != code {
+			t.Fatal(code, err)
+		}
+	}
+	if result, err := c.Generate(context.Background(), a, Input{Question: "greeting"}); err != nil || result.Status != "conversation" {
+		t.Fatal(result, err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

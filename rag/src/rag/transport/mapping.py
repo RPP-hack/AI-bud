@@ -4,6 +4,7 @@ from rag.v1 import rag_pb2 as pb
 
 
 STATUSES = {
+    "conversation": pb.ANSWER_STATUS_CONVERSATION,
     "answered": pb.ANSWER_STATUS_ANSWERED,
     "sources_found": pb.ANSWER_STATUS_SOURCES_FOUND,
     "insufficient_evidence": pb.ANSWER_STATUS_INSUFFICIENT_EVIDENCE,

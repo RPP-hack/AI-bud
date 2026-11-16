@@ -240,3 +240,33 @@ func TestConversationHTTPContract(t *testing.T) {
 		}
 	}
 }
+
+func TestConversationDependencyFailuresAndRecovery(t *testing.T) {
+	ctx := context.Background()
+	repo := chatdb.New(testDB(t))
+	actor := identity.Actor{ID: "intern-platform", Team: "platform", Role: "intern"}
+	current, err := repo.Current(ctx, actor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, code := range []string{"search_unavailable", "model_unconfigured", "model_unavailable", "model_timeout", "model_rate_limited", "model_invalid_response", "model_incomplete"} {
+		service := chat.New(repo, chatResponder(func(context.Context, identity.Actor, domain.Input) (domain.Answer, error) {
+			return domain.Answer{}, domain.DependencyFailure(code)
+		}))
+		turn, err := service.Send(ctx, actor, current.ID, code, domain.Input{Question: "Jira 403", Mode: "llm"})
+		if err != nil || turn.State != "failed" || turn.ErrorCode != code {
+			t.Fatal(turn, err)
+		}
+	}
+	service := chat.New(repo, chatResponder(func(context.Context, identity.Actor, domain.Input) (domain.Answer, error) {
+		return domain.Answer{Status: "conversation", Mode: "rules", Steps: []domain.Step{{Text: "Привет!", SourceIDs: []string{}}}, Sources: map[string]domain.Source{}}, nil
+	}))
+	turn, err := service.Send(ctx, actor, current.ID, "recovery", domain.Input{Question: "Привет", Mode: "llm"})
+	if err != nil || turn.State != "completed" || turn.Answer.Status != "conversation" {
+		t.Fatal(turn, err)
+	}
+	loaded, err := repo.Current(ctx, actor)
+	if err != nil || len(loaded.Turns) != 8 || loaded.Turns[7].Answer.Status != "conversation" {
+		t.Fatal(loaded, err)
+	}
+}
