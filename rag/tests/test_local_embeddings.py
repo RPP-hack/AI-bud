@@ -6,7 +6,7 @@ from types import ModuleType
 import unittest
 from unittest.mock import Mock, patch
 
-from rag.embeddings import EmbeddingClient, EmbeddingError, create_embedder
+from rag.embeddings import EmbeddingError, create_embedder
 from rag.local_embeddings import LocalEmbeddingClient, LocalEmbeddingConfig, _load_model
 from rag.vector_storage import PgVectorStore
 
@@ -27,26 +27,18 @@ class LocalEmbeddingTests(unittest.TestCase):
             self.assertIsInstance(client, LocalEmbeddingClient)
             self.assertEqual(client.config.model, "BAAI/bge-m3")
             self.assertEqual(client.config.dimensions, 1024)
-            self.assertFalse(client.config.requires_api_key)
-            with patch.dict(os.environ, {"RAG_EMBEDDING_PROVIDER": "api"}):
-                self.assertIsInstance(create_embedder(), EmbeddingClient)
-            with patch.dict(os.environ, {"RAG_EMBEDDING_PROVIDER": "unknown"}):
-                with self.assertRaises(ValueError):
-                    create_embedder()
 
     def test_batches_raw_text_and_normalizes_dense_vectors_without_network_api(self):
         self.model.encode.side_effect = [Mock(tolist=lambda: [[3, 0, 0], [0, 4, 0]]),
                                          Mock(tolist=lambda: [[0, 0, 2]])]
         texts = ["Меня не пускает в трекер", "Заголовок\n\nИнструкция", "Ещё вопрос"]
-        with (patch.dict(sys.modules, {"sentence_transformers": self.module}),
-              patch("rag.embeddings.build_opener") as opener):
+        with patch.dict(sys.modules, {"sentence_transformers": self.module}):
             vectors = LocalEmbeddingClient(self.config).embed(texts)
         self.assertEqual(vectors, [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
         self.assertEqual([call.args[0] for call in self.model.encode.call_args_list], [texts[:2], texts[2:]])
         for call in self.model.encode.call_args_list:
             self.assertTrue(call.kwargs["normalize_embeddings"])
             self.assertFalse(call.kwargs["show_progress_bar"])
-        opener.assert_not_called()
         self.assertFalse(self.module.SentenceTransformer.call_args.kwargs["trust_remote_code"])
 
     def test_model_is_loaded_once_across_clients_and_concurrent_warmups(self):

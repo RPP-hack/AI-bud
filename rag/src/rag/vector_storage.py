@@ -98,8 +98,6 @@ class PgVectorStore:
         """)
 
     def ready(self):
-        if self.embedder.config.requires_api_key and not self.embedder.config.api_key:
-            return False
         with self.connect(read_only=True, timeout_seconds=2) as db:
             spaces = db.execute("SELECT DISTINCT embedding_space FROM documents WHERE current").fetchall()
             return (spaces == [{"embedding_space": self.embedding_identity}]
@@ -107,8 +105,6 @@ class PgVectorStore:
                                    "WHERE d.current LIMIT 1").fetchone() is not None)
 
     def publish(self, documents):
-        if self.embedder.config.requires_api_key and not self.embedder.config.api_key:
-            raise EmbeddingError("Set RAG_EMBEDDING_API_KEY or RAG_LLM_API_KEY before indexing")
         # Prepare all vectors before publishing: provider failure leaves the old snapshot active.
         with self.connect(create=True) as db:
             existing = {row["version_id"] for row in db.execute("SELECT version_id FROM documents")}

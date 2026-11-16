@@ -13,7 +13,8 @@ import uuid
 
 from rag.access import PROFILES, request_access
 from rag.application import Actor, ApplicationError, RagApplication
-from rag.embeddings import EmbeddingConfig, EmbeddingError
+from rag.embeddings import EmbeddingError
+from rag.local_embeddings import LocalEmbeddingConfig
 from rag.ingestion.indexing import index_manifest
 from rag.ingestion.chunking import Chunk
 from rag.pipeline import ask
@@ -36,14 +37,21 @@ def passage(**changes):
 
 
 class VectorStorageTests(unittest.TestCase):
-    def test_indexing_without_a_key_fails_before_database_access_even_for_cached_vectors(self):
-        embedder = Mock(config=EmbeddingConfig())
+    def test_local_indexing_does_not_require_chat_credentials(self):
+        embedder = Mock(config=LocalEmbeddingConfig())
+        embedder.embed.return_value = []
         store = PgVectorStore(embedder=embedder)
-        with patch.object(store, "connect") as connect:
-            with self.assertRaisesRegex(EmbeddingError, "RAG_EMBEDDING_API_KEY or RAG_LLM_API_KEY"):
-                store.publish([])
-        connect.assert_not_called()
-        embedder.embed.assert_not_called()
+        db = Mock()
+        db.execute.side_effect = [[], Mock(), Mock(), Mock()]
+
+        @contextmanager
+        def connect(**kwargs):
+            yield db
+
+        with patch.dict(os.environ, {}, clear=True), patch.object(store, "connect", side_effect=connect):
+            store.publish([])
+        embedder.warmup.assert_called_once()
+        embedder.embed.assert_called_once_with([])
 
     def test_defaults_use_pgvector_even_with_legacy_sqlite_environment(self):
         with patch.dict(os.environ, {"RAG_DB_PATH": "legacy.sqlite3"}, clear=True):
@@ -81,7 +89,7 @@ class VectorStorageTests(unittest.TestCase):
         self.assertFalse(RagApplication(store).ready())
 
     def test_failed_embedding_does_not_start_snapshot_publication(self):
-        embedder = Mock(config=EmbeddingConfig("test", dimensions=3))
+        embedder = Mock(config=LocalEmbeddingConfig(model="fixture-model", dimensions=3))
         embedder.embed.side_effect = EmbeddingError("provider down")
         store = PgVectorStore(embedder=embedder)
         db = Mock()
@@ -105,7 +113,7 @@ class VectorStorageTests(unittest.TestCase):
         self.assertFalse(any("UPDATE" in call.args[0] for call in db.execute.call_args_list))
 
     def test_pg_search_embeds_raw_query_and_expands_conflicting_evidence(self):
-        embedder = Mock(config=EmbeddingConfig("test", dimensions=3))
+        embedder = Mock(config=LocalEmbeddingConfig(model="fixture-model", dimensions=3))
         embedder.embed.return_value = [[1, 0, 0]]
         store = PgVectorStore(embedder=embedder, min_similarity=0.7)
         row = asdict(passage())
@@ -136,7 +144,7 @@ class VectorStorageTests(unittest.TestCase):
         self.assertEqual(params["team"], "platform")
 
     def test_pg_publish_preserves_text_and_stores_normalized_vectors(self):
-        embedder = Mock(config=EmbeddingConfig("test", dimensions=3))
+        embedder = Mock(config=LocalEmbeddingConfig(model="fixture-model", dimensions=3))
         embedder.embed.return_value = [[3, 0, 0]]
         store = PgVectorStore(embedder=embedder)
         db = Mock()
@@ -162,7 +170,7 @@ class VectorStorageTests(unittest.TestCase):
         self.assertEqual(json.loads(values[-1]), [1, 0, 0])
 
     def test_legacy_vector_dimension_migration_retains_vectors_and_uses_partial_index(self):
-        embedder = Mock(config=EmbeddingConfig("test", dimensions=1024))
+        embedder = Mock(config=LocalEmbeddingConfig(model="fixture-model", dimensions=1024))
         store = PgVectorStore(embedder=embedder)
         db = Mock()
         db.execute.return_value.fetchone.return_value = {"atttypmod": 1536}
@@ -189,7 +197,7 @@ class PgVectorIntegrationTests(unittest.TestCase):
         self.addCleanup(admin.close)
         admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
         self.addCleanup(lambda: admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name))))
-        self.embedder = Mock(config=EmbeddingConfig("test", dimensions=3))
+        self.embedder = Mock(config=LocalEmbeddingConfig(model="fixture-model", dimensions=3))
         self.embedder.embed.side_effect = lambda texts, **kwargs: [[1, 0, 0] for _ in texts]
         self.store = PgVectorStore(make_conninfo(admin_dsn, dbname=name),
                                    embedder=self.embedder, min_similarity=0.9)

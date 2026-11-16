@@ -39,10 +39,6 @@ class LocalEmbeddingConfig:
             raise ValueError("RAG_EMBEDDING_BATCH_SIZE must be between 1 and 128")
 
     @property
-    def requires_api_key(self):
-        return False
-
-    @property
     def identity(self):
         return json.dumps(["local-dense", self.model, self.revision, self.dimensions], separators=(",", ":"))
 

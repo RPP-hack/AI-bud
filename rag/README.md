@@ -56,7 +56,6 @@ docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run 
 
 | Переменная | Значение по умолчанию / назначение |
 |---|---|
-| `RAG_EMBEDDING_PROVIDER` | `local`; `api` включает прежний OpenAI-совместимый клиент. |
 | `RAG_EMBEDDING_MODEL` | `BAAI/bge-m3`. |
 | `RAG_EMBEDDING_DIMENSIONS` | `1024`; BGE-M3 требует именно эту размерность. |
 | `RAG_EMBEDDING_REVISION` | Закреплённая ревизия `5617a9f61b028005a4858fdac845db406aefb181`; входит в идентификатор пространства. |
@@ -67,7 +66,6 @@ docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run 
 
 После перехода со старой embedding-модели выполните `python3 -m rag index` или пересоздайте `rag-index` в Compose. При первой индексации схема автоматически переходит с фиксированного `vector(1536)` на `vector` с отдельным частичным HNSW-индексом для каждой размерности. Старые векторы и версии сохраняются; поиск использует только текущее пространство. Снимок переключится на BGE-M3 после успешной переиндексации. Смена модели, размерности или ревизии требует повторной индексации.
 
-Для внешних embeddings явно задайте `RAG_EMBEDDING_PROVIDER=api`, модель `openai/text-embedding-3-small`, размерность `1536`, `RAG_EMBEDDING_BASE_URL=https://openrouter.ai/api/v1` и ключ `RAG_EMBEDDING_API_KEY` (пустое значение использует `RAG_LLM_API_KEY`). Автоматического переключения с локальной модели на API нет.
 
 Предложение `preview_jira_access` определяется актуальной инструкцией `jira.bud.read`, занимающей первое место в поиске и присутствующей в источниках ответа. Подтверждение заявки остаётся отдельным действием. SQLite-адаптер используется только при явном создании `SQLiteStore` в тестах; CLI и сервер по умолчанию используют PostgreSQL.
 
