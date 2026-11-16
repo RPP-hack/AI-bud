@@ -39,6 +39,7 @@ services:
       - "127.0.0.1:8080:8080"
 
   rag-index:
+    pull_policy: build
     build:
       context: ./rag
       target: server
@@ -58,6 +59,7 @@ services:
         condition: service_healthy
 
   rag:
+    pull_policy: build
     build:
       context: ./rag
       target: server
@@ -112,6 +114,7 @@ services:
       timeout: 3s
       retries: 20
   rag-cli:
+    pull_policy: build
     profiles: ["rag"]
     build:
       context: ./rag

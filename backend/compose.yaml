@@ -57,6 +57,7 @@ services:
       rag:
         condition: service_healthy
   rag-index:
+    pull_policy: build
     build:
       context: ../rag
       target: server
@@ -69,6 +70,7 @@ services:
       db:
         condition: service_healthy
   rag:
+    pull_policy: build
     build:
       context: ../rag
       target: server
