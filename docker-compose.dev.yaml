@@ -1,24 +1,134 @@
 name: rpp-buddy
+
 services:
+  db:
+    image: postgres:17.6-alpine
+    env_file:
+      - ./backend/.env.compose.example
+    volumes:
+      - buddy-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  mock-access:
+    build:
+      context: ./backend/services/api
+    entrypoint: ["mock-access"]
+    env_file:
+      - ./backend/.env.compose.example
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./backend/services/api
+    env_file:
+      - ./backend/.env.compose.example
+    depends_on:
+      db:
+        condition: service_healthy
+      mock-access:
+        condition: service_started
+      rag:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  rag-index:
+    pull_policy: build
+    build:
+      context: ./rag
+      target: server
+    entrypoint: ["python", "-m", "rag"]
+    command: ["index"]
+    env_file: &rag-env
+      - ./rag/.env.compose.example
+      - path: ./rag/.env
+        required: false
+    environment: &rag-storage
+      RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
+      HF_HOME: /models
+    volumes:
+      - rag-models:/models
+    depends_on:
+      rag-db:
+        condition: service_healthy
+
+  rag:
+    pull_policy: build
+    build:
+      context: ./rag
+      target: server
+    env_file: *rag-env
+    environment:
+      <<: *rag-storage
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - rag-models:/models
+    depends_on:
+      rag-db:
+        condition: service_healthy
+      rag-index:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8001/ready', timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 120s
+   
+  frontend-build:
+    image: node:22-alpine
+    working_dir: /app
+    command: ["sh", "-c", "npm ci --no-audit --no-fund && npm run build"]
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+  
   rpp-buddy-gateway:
     image: caddy:latest
-    container_name: rpp-buddy-gateway
     ports:
       - "80:80"
+    environment:
+      API_UPSTREAM: api:8080
     volumes:
       - ./gateway:/etc/caddy
       - ./frontend:/var/www/html
-  rag:
+  rag-db:
+    image: pgvector/pgvector:0.8.1-pg17
+    environment:
+      POSTGRES_USER: buddy
+      POSTGRES_PASSWORD: buddy-local
+      POSTGRES_DB: buddy
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - rag-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U buddy -d buddy"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  rag-cli:
+    pull_policy: build
     profiles: ["rag"]
     build:
       context: ./rag
       target: demo
-    environment:
-      RAG_LLM_API_KEY: "${RAG_LLM_API_KEY:-}"
-      RAG_LLM_BASE_URL: "${RAG_LLM_BASE_URL:-https://openrouter.ai/api/v1}"
-      RAG_LLM_MODEL: "${RAG_LLM_MODEL:-openai/gpt-4o-mini}"
+    env_file: *rag-env
+    environment: *rag-storage
     volumes:
-      - rag-data:/data
+      - rag-models:/models
+    depends_on:
+      rag-db:
+        condition: service_healthy
 
 volumes:
-  rag-data:
+  buddy-db:
+  frontend-node-modules:
+  rag-db:
+  rag-models:

@@ -6,6 +6,7 @@ __pycache__/
 ../.idea/
 .DS_Store
 .env
+.env.compose
 coverage.out
 coverage.html
 bin/
@@ -14,3 +15,7 @@ bin/
 /rag/dist/
 /rag/evals/reports/
 .idea
+/frontend/node_modules/
+/frontend/dist/
+/frontend/coverage/
+/frontend/*.tsbuildinfo

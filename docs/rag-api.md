@@ -20,7 +20,7 @@ curl -sS http://localhost:8080/api/rag/answers \
 ```
 
 Compose publishes a demo knowledge snapshot through `rag-index`, then starts
-Python with the index mounted read-only. Ports 8080 (Go), 8001 (Python REST), and
+Python with the published pgvector index and the shared local model cache. Ports 8080 (Go), 8001 (Python REST), and
 50051 (Python gRPC) are published only on loopback. Offline is the default mode.
 To request online generation, configure `RAG_LLM_API_KEY` before starting Compose
 and send `"mode":"llm"`. Missing provider configuration returns 503 when generation
@@ -50,14 +50,23 @@ From the repository root, using Python 3.11+:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install -e './rag[server,dev]'
+python -m pip install -e './rag[server,dev,local]'
+set -a
+. ./rag/.env
+set +a
+docker compose -f docker-compose.dev.yaml --profile rag up -d rag-db
 python -m rag index
 export RAG_SERVICE_TOKEN=local-rag-token
 python -m rag.transport.server
 ```
 
 This starts REST at `127.0.0.1:8001` and gRPC at `127.0.0.1:50051`. Configure
-`RAG_DB_PATH`, `RAG_HTTP_HOST`, `RAG_HTTP_PORT`, and `RAG_GRPC_ADDR` as needed.
+`RAG_DATABASE_URL`, `RAG_HTTP_HOST`, `RAG_HTTP_PORT`, and `RAG_GRPC_ADDR` as needed.
+Create `rag/.env` from `rag/.env.example` before running these commands;
+see [embedding configuration](../rag/README.md#семантический-поиск).
+Embeddings use local BAAI/bge-m3 by default, with no API key. The first run
+downloads the model. Offline answers require the cached model and PostgreSQL;
+they skip chat generation.
 To start REST alone: `uvicorn rag.transport.rest:create_app --factory --port 8001`.
 The REST OpenAPI schema is available at `http://localhost:8001/openapi.json`.
 
@@ -135,7 +144,7 @@ curl -sS http://localhost:8080/api/access-requests \
 ```
 
 The existing Go policy, confirmation, idempotency and reconciliation govern this
-operation. Python's SQLite access adapter remains a CLI demo and is not called by
+operation. Python's access adapter remains a CLI demo and is not called by
 either network transport. Source freshness is advisory for this demo suggestion;
 Go's action authorization is its own policy, not a live check of the Python index.
 

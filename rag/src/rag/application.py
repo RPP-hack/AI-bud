@@ -11,9 +11,10 @@ import time
 import uuid
 
 from .generation import GenerationConfig, GenerationError, Generator, GuardrailError
+from .embeddings import EmbeddingError
 from .pipeline import ask
 from .retrieval import Retriever
-from .storage import Audience, SQLiteStore
+from .storage import Audience, StorageError, create_store
 from .guardrails import validate_question
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ class RagApplication:
     def __init__(self, store=None, *, concurrency=16, timeout_seconds=30, generator_factory=None):
         if concurrency < 1 or not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             raise ValueError("Invalid RAG application limits")
-        self.store = store if store is not None else SQLiteStore()
+        self.store = store if store is not None else create_store()
         self.timeout_seconds = timeout_seconds
         self._slots = threading.BoundedSemaphore(concurrency)
         self._generator_factory = generator_factory or self._generator
@@ -59,10 +60,8 @@ class RagApplication:
 
     def ready(self):
         try:
-            with self.store.connect(read_only=True) as db:
-                return (db.execute("SELECT count(*) FROM documents WHERE current=1").fetchone()[0] > 0
-                        and db.execute("SELECT count(*) FROM passages").fetchone()[0] > 0)
-        except (sqlite3.Error, OSError):
+            return self.store.ready()
+        except (sqlite3.Error, OSError, StorageError):
             return False
 
     @staticmethod
@@ -104,7 +103,7 @@ class RagApplication:
             if time.monotonic() >= deadline:
                 raise ApplicationError("deadline_exceeded") from None
             raise ApplicationError("temporarily_unavailable") from None
-        except (sqlite3.Error, OSError, GenerationError):
+        except (sqlite3.Error, OSError, GenerationError, StorageError, EmbeddingError):
             if time.monotonic() >= deadline:
                 raise ApplicationError("deadline_exceeded") from None
             logger.warning("RAG dependency failed")
@@ -128,7 +127,8 @@ class RagApplication:
                     return factory(timeout)._complete(question, audience, fresh)
 
             result = ask(question, audience=audience, store=self.store,
-                         generator=DeadlineGenerator(), offline=mode == "offline", top_k=top_k)
+                         generator=DeadlineGenerator(), offline=mode == "offline", top_k=top_k,
+                         timeout_seconds=remaining())
             response = dict(request_id=request_id, status=result.status, mode=result.mode,
                             steps=[asdict(step) for step in result.steps],
                             sources={key: source_view(chunk) for key, chunk in result.sources.items()},
@@ -137,7 +137,8 @@ class RagApplication:
 
     def search(self, query, actor, *, request_id="", top_k=3, timeout_seconds=None):
         audience, request_id = self._validate(query, actor, top_k, request_id)
-        with self._attempt(timeout_seconds):
-            hits = Retriever(self.store).retrieve(query, audience=audience, top_k=top_k)
+        with self._attempt(timeout_seconds) as remaining:
+            hits = Retriever(self.store).retrieve(query, audience=audience, top_k=top_k,
+                                                  timeout_seconds=remaining())
             response = dict(request_id=request_id, sources=[source_view(chunk) for chunk in hits])
         return response

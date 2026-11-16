@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from ..storage import ROLES, SOURCE_TYPES, SQLiteStore
+from ..storage import ROLES, SOURCE_TYPES, create_store
 from .chunking import chunk_pages
 from .loaders import load_document
 
@@ -26,7 +26,7 @@ def _find_demo_manifest():
 DEMO_MANIFEST = _find_demo_manifest()
 _REQUIRED = {"id", "path", "title", "source_type", "origin", "team", "roles"}
 _OPTIONAL = {"review_by", "source_url", "rule_key", "rule_value"}
-INDEX_VERSION = 1  # bump when normalization changes so the FTS rows are rebuilt
+INDEX_VERSION = 2  # include the embedding space in immutable document versions
 
 
 def _metadata(entry):
@@ -72,7 +72,8 @@ def index_manifest(path, store, *, ocr=True, chunk_size=1400, chunk_overlap=160)
         if not chunks:
             raise ValueError(f"No searchable passages in {source.name}")
         content = [asdict(chunk) for chunk in chunks]
-        identity = json.dumps([INDEX_VERSION, meta, content], sort_keys=True, ensure_ascii=False)
+        identity = json.dumps([INDEX_VERSION, getattr(store, "embedding_identity", None), meta, content],
+                              sort_keys=True, ensure_ascii=False)
         prepared.append((meta, sha256(identity.encode()).hexdigest(), chunks))
     store.publish(prepared)
     return {meta["id"]: len(chunks) for meta, _, chunks in prepared}
@@ -83,7 +84,7 @@ def main(argv=None):
     parser.add_argument("manifest", type=Path, nargs="?", default=DEMO_MANIFEST)
     parser.add_argument("--no-ocr", action="store_true")
     args = parser.parse_args(argv)
-    indexed = index_manifest(args.manifest, SQLiteStore(), ocr=not args.no_ocr)
+    indexed = index_manifest(args.manifest, create_store(), ocr=not args.no_ocr)
     print(f"Проиндексировано документов: {len(indexed)}, фрагментов: {sum(indexed.values())}")
 
 
