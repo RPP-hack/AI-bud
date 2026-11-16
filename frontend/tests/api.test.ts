@@ -3,6 +3,32 @@ import { Api, ApiError, errorText } from "../src/api";
 import { request } from "./fixtures";
 
 describe("explicit same-origin API client", () => {
+  it("keeps the browser receiver when using the native fetch default", async () => {
+    const browserFetch = vi.fn(function (this: unknown) {
+      if (this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            id: "intern-platform",
+            role: "intern",
+            team: "platform",
+            status: "ready",
+          }),
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", browserFetch);
+    try {
+      const api = new Api("demo-intern-platform");
+      expect(await api.me()).toMatchObject({ id: "intern-platform" });
+      expect(await api.health()).toMatchObject({ status: "ready" });
+      expect(await api.ready()).toMatchObject({ status: "ready" });
+      expect(browserFetch).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("uses every public REST operation with exact methods, versions and delegated auth", async () => {
     const fetcher = vi
       .fn()
