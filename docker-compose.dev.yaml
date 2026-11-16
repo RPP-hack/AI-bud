@@ -48,8 +48,11 @@ services:
       - ./rag/.env.compose.example
       - path: ./rag/.env
         required: false
-    environment:
+    environment: &rag-storage
       RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
+      HF_HOME: /models
+    volumes:
+      - rag-models:/models
     depends_on:
       rag-db:
         condition: service_healthy
@@ -60,7 +63,10 @@ services:
       target: server
     env_file: *rag-env
     environment:
-      RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
+      <<: *rag-storage
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - rag-models:/models
     depends_on:
       rag-db:
         condition: service_healthy
@@ -71,6 +77,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+      start_period: 120s
    
   frontend-build:
     image: node:22-alpine
@@ -110,8 +117,9 @@ services:
       context: ./rag
       target: demo
     env_file: *rag-env
-    environment:
-      RAG_DATABASE_URL: postgresql://buddy:buddy-local@rag-db:5432/buddy
+    environment: *rag-storage
+    volumes:
+      - rag-models:/models
     depends_on:
       rag-db:
         condition: service_healthy
@@ -120,3 +128,4 @@ volumes:
   buddy-db:
   frontend-node-modules:
   rag-db:
+  rag-models:

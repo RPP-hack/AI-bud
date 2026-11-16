@@ -18,7 +18,7 @@ from .guardrails import (MAX_ANSWER_CHARS, MAX_STEPS, is_instruction_attack,
                          output_violation, validate_question)
 
 
-DEFAULT_MODEL = "openai/gpt-4o-mini"
+DEFAULT_MODEL = "openrouter/free"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 MAX_RESPONSE_BYTES = 1024 * 1024
 

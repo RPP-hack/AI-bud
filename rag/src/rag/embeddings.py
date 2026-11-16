@@ -46,6 +46,10 @@ class EmbeddingConfig:
             raise ValueError("Invalid embedding timeout")
 
     @property
+    def requires_api_key(self):
+        return True
+
+    @property
     def identity(self):
         # Never mix vectors produced by different models/providers or dimensions.
         return json.dumps([self.base_url, self.model, self.dimensions], separators=(",", ":"))
@@ -128,3 +132,13 @@ class EmbeddingClient:
             except (ValueError, KeyError, TypeError, UnicodeDecodeError, RecursionError):
                 raise EmbeddingError("Invalid embedding gateway response") from None
         return vectors
+
+
+def create_embedder():
+    provider = os.environ.get("RAG_EMBEDDING_PROVIDER", "local")
+    if provider == "local":
+        from .local_embeddings import LocalEmbeddingClient
+        return LocalEmbeddingClient()
+    if provider == "api":
+        return EmbeddingClient()
+    raise ValueError("RAG_EMBEDDING_PROVIDER must be local or api")

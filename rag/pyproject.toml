@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = ["psycopg[binary]>=3.2,<4"]
 
 [project.optional-dependencies]
+local = ["sentence-transformers>=5.1,<6"]
 pdf = ["pypdf==6.21.4", "pypdfium2==5.13.0", "Pillow==13.0.0"]
 server = ["fastapi==0.163.0", "pydantic==2.14.3", "uvicorn==0.54.0", "grpcio==1.85.1", "grpcio-health-checking==1.85.1", "protobuf==7.36.2"]
 dev = ["grpcio-tools==1.85.1", "httpx==0.28.1"]

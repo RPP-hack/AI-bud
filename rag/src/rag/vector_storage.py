@@ -6,7 +6,7 @@ import math
 import os
 import time
 
-from .embeddings import EmbeddingClient, EmbeddingError, normalize_vector
+from .embeddings import EmbeddingError, create_embedder, normalize_vector
 from .storage import StorageError, _COLUMNS
 
 
@@ -30,10 +30,9 @@ CREATE TABLE IF NOT EXISTS chunks (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     version_id TEXT NOT NULL REFERENCES documents(version_id), chunk_id TEXT NOT NULL,
     text TEXT NOT NULL, page_number INTEGER, start_char INTEGER NOT NULL, end_char INTEGER NOT NULL,
-    extraction_method TEXT NOT NULL, embedding vector({dimensions}) NOT NULL,
+    extraction_method TEXT NOT NULL, embedding vector NOT NULL,
     UNIQUE(version_id, chunk_id)
 );
-CREATE INDEX IF NOT EXISTS chunk_embedding ON chunks USING hnsw (embedding vector_cosine_ops);
 CREATE TABLE IF NOT EXISTS access_requests (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     employee TEXT NOT NULL, project TEXT NOT NULL, permission TEXT NOT NULL,
@@ -46,7 +45,7 @@ class PgVectorStore:
     def __init__(self, dsn=None, *, embedder=None, min_similarity=None):
         self.dsn = dsn or os.environ.get(
             "RAG_DATABASE_URL", "postgresql://buddy:buddy-local@localhost:55432/buddy")
-        self.embedder = embedder if embedder is not None else EmbeddingClient()
+        self.embedder = embedder if embedder is not None else create_embedder()
         self.embedding_identity = self.embedder.config.identity
         self.dimensions = self.embedder.config.dimensions
         self.min_similarity = (float(os.environ.get("RAG_MIN_SIMILARITY", "0.3"))
@@ -72,20 +71,34 @@ class PgVectorStore:
                 db.execute("SELECT set_config('statement_timeout', %s, true)",
                            (str(max(1, int(timeout_seconds * 1000))),))
                 if create:
+                    db.execute("SELECT pg_advisory_xact_lock(72419601)")
                     db.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public")
                     db.execute("CREATE SCHEMA IF NOT EXISTS rag")
-                    db.execute(_SCHEMA.format(dimensions=self.dimensions))
-                    db.execute("INSERT INTO index_config VALUES (1, %s) ON CONFLICT DO NOTHING",
-                               (self.dimensions,))
-                    if db.execute("SELECT dimensions FROM index_config WHERE id=1").fetchone()["dimensions"] != self.dimensions:
-                        raise StorageError("Embedding dimensions changed; use a new database and reindex")
+                    db.execute(_SCHEMA)
+                    self._migrate_vectors(db)
                 yield db
         except psycopg.Error:
             # Do not expose DSNs, SQL parameters or source text to transports/logs.
             raise StorageError("PostgreSQL vector index unavailable") from None
 
+    def _migrate_vectors(self, db):
+        # Remove only the old fixed-size index; retain every historical vector and citation.
+        typmod = db.execute("""
+            SELECT atttypmod FROM pg_attribute
+            WHERE attrelid = 'rag.chunks'::regclass AND attname = 'embedding'
+        """).fetchone()["atttypmod"]
+        if typmod != -1:
+            db.execute("DROP INDEX IF EXISTS chunk_embedding")
+            db.execute("ALTER TABLE chunks ALTER COLUMN embedding TYPE vector")
+        dimensions = self.dimensions  # validated integer, never interpolated user text
+        db.execute(f"""
+            CREATE INDEX IF NOT EXISTS chunk_embedding_{dimensions} ON chunks
+            USING hnsw ((embedding::vector({dimensions})) vector_cosine_ops)
+            WHERE vector_dims(embedding) = {dimensions}
+        """)
+
     def ready(self):
-        if not self.embedder.config.api_key:
+        if self.embedder.config.requires_api_key and not self.embedder.config.api_key:
             return False
         with self.connect(read_only=True, timeout_seconds=2) as db:
             spaces = db.execute("SELECT DISTINCT embedding_space FROM documents WHERE current").fetchall()
@@ -94,11 +107,14 @@ class PgVectorStore:
                                    "WHERE d.current LIMIT 1").fetchone() is not None)
 
     def publish(self, documents):
-        if not self.embedder.config.api_key:
+        if self.embedder.config.requires_api_key and not self.embedder.config.api_key:
             raise EmbeddingError("Set RAG_EMBEDDING_API_KEY or RAG_LLM_API_KEY before indexing")
         # Prepare all vectors before publishing: provider failure leaves the old snapshot active.
         with self.connect(create=True) as db:
             existing = {row["version_id"] for row in db.execute("SELECT version_id FROM documents")}
+        warmup = getattr(self.embedder, "warmup", None)
+        if warmup is not None:
+            warmup()  # populate the shared model cache even when all vectors are already indexed
         missing = [(meta, version, chunks) for meta, version, chunks in documents if version not in existing]
         texts = [meta["title"] + "\n\n" + chunk.text
                  for meta, _, chunks in missing for chunk in chunks]
@@ -130,6 +146,8 @@ class PgVectorStore:
                     """, [(version, chunk.chunk_id, chunk.text, chunk.page_number, chunk.start_char,
                            chunk.end_char, chunk.extraction_method, vector)
                           for chunk, vector in zip(chunks, prepared[version])])
+            db.execute("INSERT INTO index_config VALUES (1, %s) "
+                       "ON CONFLICT(id) DO UPDATE SET dimensions = EXCLUDED.dimensions", (self.dimensions,))
 
     def search(self, query, audience, top_k, today, *, timeout_seconds=None):
         budget = 30 if timeout_seconds is None else timeout_seconds
@@ -143,12 +161,13 @@ class PgVectorStore:
             if spaces and spaces != [{"embedding_space": self.embedding_identity}]:
                 raise StorageError("Embedding configuration changed; reindex the documents")
             db.execute("SET LOCAL hnsw.iterative_scan = 'strict_order'")
+            vector = f"c.embedding::vector({self.dimensions})"
             selected = db.execute(f"""
                 WITH nearest AS MATERIALIZED (
-                    SELECT {_COLUMNS}, c.embedding <=> %(vector)s::vector AS distance
+                    SELECT {_COLUMNS}, {vector} <=> %(vector)s::vector AS distance
                     FROM documents d JOIN chunks c USING(version_id)
-                    WHERE {_VISIBLE}
-                    ORDER BY c.embedding <=> %(vector)s::vector LIMIT %(top_k)s
+                    WHERE {_VISIBLE} AND vector_dims(c.embedding) = {self.dimensions}
+                    ORDER BY {vector} <=> %(vector)s::vector LIMIT %(top_k)s
                 )
                 SELECT * FROM nearest WHERE distance <= %(max_distance)s
                 ORDER BY distance, document_id, chunk_id
@@ -159,7 +178,7 @@ class PgVectorStore:
             for key in sorted(keys):
                 variants = db.execute(f"""
                     SELECT {_COLUMNS} FROM documents d JOIN chunks c USING(version_id)
-                    WHERE {_VISIBLE} AND d.rule_key = %(key)s
+                    WHERE {_VISIBLE} AND vector_dims(c.embedding) = {self.dimensions} AND d.rule_key = %(key)s
                       AND (d.review_by IS NULL OR d.review_by >= %(today)s)
                     ORDER BY d.document_id, c.id
                 """, dict(params, key=key)).fetchall()
