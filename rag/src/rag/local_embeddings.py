@@ -1,6 +1,7 @@
 """Local dense BGE-M3 embeddings, with one model and inference lock per process."""
 
 from dataclasses import dataclass
+from collections import OrderedDict
 from functools import lru_cache
 import logging
 import json
@@ -72,6 +73,7 @@ def _load_model(model, revision, device, cache_dir, local_files_only):
 class LocalEmbeddingClient:
     def __init__(self, config=None):
         self.config = config if config is not None else LocalEmbeddingConfig.from_env()
+        self._cache = OrderedDict()
 
     def _model(self):
         config = self.config
@@ -105,6 +107,10 @@ class LocalEmbeddingClient:
         if not acquired:
             raise EmbeddingError("Embedding deadline exceeded while waiting for the local model")
         try:
+            key = tuple(texts)
+            if key in self._cache:
+                self._cache.move_to_end(key)
+                return [list(vector) for vector in self._cache[key]]
             model = self._model()
             vectors = []
             for offset in range(0, len(texts), self.config.batch_size):
@@ -116,6 +122,9 @@ class LocalEmbeddingClient:
                 if len(result) != len(batch):
                     raise EmbeddingError("Local embedding count did not match the input")
                 vectors.extend(normalize_vector(vector, self.config.dimensions) for vector in result)
+            self._cache[key] = tuple(tuple(vector) for vector in vectors)
+            if len(self._cache) > 32:
+                self._cache.popitem(last=False)
             return vectors
         except (OSError, RuntimeError, ValueError) as exc:
             if isinstance(exc, EmbeddingError):

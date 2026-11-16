@@ -43,7 +43,7 @@ def source_view(chunk):
 
 
 class RagApplication:
-    def __init__(self, store=None, *, concurrency=16, timeout_seconds=30, generator_factory=None):
+    def __init__(self, store=None, *, concurrency=16, timeout_seconds=60, generator_factory=None):
         if concurrency < 1 or not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             raise ValueError("Invalid RAG application limits")
         self.store = store if store is not None else create_store()
@@ -56,7 +56,7 @@ class RagApplication:
         try:
             config = GenerationConfig.from_env()
         except ValueError:
-            raise ApplicationError("temporarily_unavailable") from None
+            raise ApplicationError("model_unconfigured") from None
         return Generator(replace(config, timeout_seconds=min(25, timeout_seconds)))
 
     def ready(self):
@@ -99,16 +99,16 @@ class RagApplication:
             yield lambda: max(0, deadline - time.monotonic())
             if time.monotonic() >= deadline:
                 raise ApplicationError("deadline_exceeded")
-        except GuardrailError as exc:
-            logger.warning("RAG output rejected (%s)", exc.code)
+        except GenerationError as exc:
+            logger.warning("RAG dependency=model code=%s", exc.code)
             if time.monotonic() >= deadline:
                 raise ApplicationError("deadline_exceeded") from None
-            raise ApplicationError("temporarily_unavailable") from None
-        except (sqlite3.Error, OSError, GenerationError, StorageError, EmbeddingError):
+            raise ApplicationError("model_invalid_response" if isinstance(exc, GuardrailError) else exc.code) from None
+        except (sqlite3.Error, OSError, StorageError, EmbeddingError):
+            logger.warning("RAG dependency=search code=search_unavailable")
             if time.monotonic() >= deadline:
                 raise ApplicationError("deadline_exceeded") from None
-            logger.warning("RAG dependency failed")
-            raise ApplicationError("temporarily_unavailable") from None
+            raise ApplicationError("search_unavailable") from None
         finally:
             self._slots.release()
 
@@ -131,7 +131,13 @@ class RagApplication:
                         raise ApplicationError("deadline_exceeded")
                     generator = factory(timeout)
                     generator.history = history
-                    return generator._complete(question, audience, fresh)
+                    started = time.monotonic()
+                    try:
+                        result = generator._complete(question, audience, fresh)
+                        logger.info("RAG stage=model model=%s", result.model)
+                        return result
+                    finally:
+                        logger.info("RAG stage=model elapsed_ms=%d", (time.monotonic() - started) * 1000)
 
             result = ask(question, audience=audience, store=self.store,
                          generator=DeadlineGenerator(), offline=mode == "offline", top_k=top_k,

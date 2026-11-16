@@ -62,7 +62,7 @@ func (s *Service) Send(ctx context.Context, actor identity.Actor, id, key string
 		return turn, err
 	}
 	input.History = history(previous)
-	generation, cancel := context.WithTimeout(context.WithoutCancel(ctx), 31*time.Second)
+	generation, cancel := context.WithTimeout(context.WithoutCancel(ctx), 61*time.Second)
 	var answer domain.Answer
 	if s.responder == nil {
 		err = domain.ErrUnavailable
@@ -79,6 +79,10 @@ func (s *Service) Send(ctx context.Context, actor identity.Actor, id, key string
 }
 
 func failureCode(err error) string {
+	var dependency domain.DependencyError
+	if errors.As(err, &dependency) {
+		return dependency.Code
+	}
 	switch {
 	case errors.Is(err, domain.ErrDeadline), errors.Is(err, context.DeadlineExceeded):
 		return "deadline_exceeded"

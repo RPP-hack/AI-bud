@@ -107,3 +107,40 @@ describe("persistent conversation", () => {
     expect(screen.getByText(turn.question)).toBeVisible();
   });
 });
+
+it("shows conversational replies without citations and offers supported questions", async () => {
+  const api = new Api("token");
+  vi.spyOn(api, "conversation").mockResolvedValue({ ...chat, turns: [] });
+  const send = vi
+    .spyOn(api, "sendMessage")
+    .mockResolvedValue({
+      ...turn,
+      question: "Привет",
+      answer: {
+        ...answer,
+        status: "conversation",
+        mode: "rules",
+        model: null,
+        steps: [
+          { text: "Привет! Я твой помощник по онбордингу.", source_ids: [] },
+        ],
+        sources: {},
+        next_step: "С чего начнём?",
+        action: null,
+      },
+    });
+  const user = userEvent.setup();
+  render(
+    <Assistant api={api} actor={actor} search={false} onProposal={vi.fn()} />,
+  );
+  await user.type(screen.getByRole("textbox"), "Привет{Enter}");
+  expect(
+    await screen.findByText("Привет! Я твой помощник по онбордингу."),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "[S1]" }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Не открывается Jira" }));
+  await waitFor(() => expect(send).toHaveBeenCalledTimes(2));
+  expect(send.mock.calls[1][2]).toContain("Jira");
+});

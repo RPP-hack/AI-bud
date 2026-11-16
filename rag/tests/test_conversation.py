@@ -28,7 +28,7 @@ class ConversationTests(unittest.TestCase):
                          store=self.store, offline=True, history=self.history)
         query = retriever.return_value.retrieve.call_args.args[0]
         self.assertIn("Jira 403", query)
-        self.assertIn("Что дальше?", query)
+        self.assertEqual(query, "Jira 403")
         self.assertNotIn("Запроси чтение", query)
         self.assertEqual(result.status, "insufficient_evidence")
         self.assertLessEqual(len(retrieval_question("x" * 4000, self.history)), 4000)

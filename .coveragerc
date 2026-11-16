@@ -1,0 +1,13 @@
+[run]
+source = rag
+relative_files = True
+omit =
+    rag/src/rag/v1/*
+    rag/tests/*
+
+[report]
+show_missing = True
+fail_under = 81
+
+[xml]
+output = docs/coverage/python.xml

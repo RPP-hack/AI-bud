@@ -41,6 +41,19 @@ class LocalEmbeddingTests(unittest.TestCase):
             self.assertFalse(call.kwargs["show_progress_bar"])
         self.assertFalse(self.module.SentenceTransformer.call_args.kwargs["trust_remote_code"])
 
+    def test_cached_embeddings_are_bounded_and_return_independent_vectors(self):
+        self.model.encode.return_value = Mock(tolist=lambda: [[1, 0, 0]])
+        with patch.dict(sys.modules, {"sentence_transformers": self.module}):
+            client = LocalEmbeddingClient(self.config)
+            first = client.embed(["Jira 403"])
+            first[0][0] = 999
+            self.assertEqual(client.embed(["Jira 403"]), [[1, 0, 0]])
+            self.model.encode.assert_called_once()
+            for i in range(35):
+                client.embed([f"question {i}"])
+            self.assertEqual(len(client._cache), 32)
+            self.assertNotIn(("Jira 403",), client._cache)
+
     def test_model_is_loaded_once_across_clients_and_concurrent_warmups(self):
         with patch.dict(sys.modules, {"sentence_transformers": self.module}):
             with ThreadPoolExecutor(max_workers=4) as workers:

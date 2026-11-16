@@ -16,6 +16,7 @@ from .retrieval import Retriever
 from .storage import StorageError, create_store
 
 _STATUS = {
+    "conversation": "AI-buddy",
     "conflict": "Инструкции расходятся", "insufficient_evidence": "Недостаточно сведений",
     "needs_review": "Нужна актуальная инструкция", "answered": "Ответ модели",
     "sources_found": "Офлайн · выдержки из источников",

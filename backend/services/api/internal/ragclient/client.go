@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const Timeout = 30 * time.Second
+const Timeout = 60 * time.Second
 
 type Input = conversation.Input
 type Source = conversation.Source
@@ -82,6 +82,7 @@ func (c *Client) Answer(ctx context.Context, a identity.Actor, in Input) (Answer
 		pb.AnswerStatus_ANSWER_STATUS_ANSWERED: "answered", pb.AnswerStatus_ANSWER_STATUS_SOURCES_FOUND: "sources_found",
 		pb.AnswerStatus_ANSWER_STATUS_INSUFFICIENT_EVIDENCE: "insufficient_evidence", pb.AnswerStatus_ANSWER_STATUS_CONFLICT: "conflict",
 		pb.AnswerStatus_ANSWER_STATUS_NEEDS_REVIEW: "needs_review",
+		pb.AnswerStatus_ANSWER_STATUS_CONVERSATION: "conversation",
 	}
 	state, ok := states[r.Status]
 	if !ok {
@@ -124,6 +125,9 @@ func (c *Client) Generate(ctx context.Context, actor identity.Actor, input conve
 	answer, err := c.Answer(ctx, actor, input)
 	if err == nil {
 		return answer, nil
+	}
+	if failure := conversation.DependencyFailure(status.Convert(err).Message()); failure != conversation.ErrUnavailable {
+		return answer, failure
 	}
 	switch status.Code(err) {
 	case codes.InvalidArgument:

@@ -123,7 +123,7 @@ class GuardrailTests(unittest.TestCase):
         self.client.complete.return_value = response("Я создал заявку BUD-ACCESS-77.")
         app = RagApplication(self.store, generator_factory=lambda _: self.generator)
         with self.assertLogs("rag.application", level="WARNING") as logs:
-            with self.assertRaisesRegex(ApplicationError, "^temporarily_unavailable$"):
+            with self.assertRaisesRegex(ApplicationError, "^model_invalid_response$"):
                 app.answer("Jira 403", Actor("u", "intern", "platform"), mode="llm")
         self.assertIn("unverified_action", " ".join(logs.output))
         self.assertNotIn("BUD-ACCESS-77", " ".join(logs.output))

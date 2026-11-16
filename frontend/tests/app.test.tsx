@@ -70,8 +70,9 @@ describe("application shell and identity isolation", () => {
     expect(
       (await screen.findAllByText("Запроси чтение BUD.")).length,
     ).toBeGreaterThan(0);
+    await user.click(screen.getByText("Демонстрация прав доступа"));
     await user.selectOptions(
-      screen.getByLabelText("Учебный профиль"),
+      screen.getByLabelText("Демо-профиль"),
       "demo-mentor-platform",
     );
     await screen.findByText(/Осваивайся/);
@@ -83,16 +84,12 @@ describe("application shell and identity isolation", () => {
       mock.mock.calls.filter((c) => c[0] === "/api/me").at(-1)?.[1]?.headers,
     ).toMatchObject({ Authorization: "Bearer demo-mentor-platform" });
     await user.selectOptions(
-      screen.getByLabelText("Учебный профиль"),
-      "demo-alex",
+      screen.getByLabelText("Демо-профиль"),
+      "demo-intern-search",
     );
-    await screen.findByText("А");
-    await user.selectOptions(
-      screen.getByLabelText("Учебный профиль"),
-      "demo-sam",
-    );
-    await screen.findByText("С");
-  });
+    await screen.findByText(/Осваивайся/);
+    expect(sessionStorage.getItem("buddy-profile")).toBe("demo-intern-search");
+  }, 15000);
   it("handles API unavailable, invalid session and manual reconnect", async () => {
     const mock = installFetch();
     const user = userEvent.setup();
@@ -124,6 +121,17 @@ describe("application shell and identity isolation", () => {
     );
     expect(await screen.findByText(/Осваивайся/)).toBeVisible();
   });
+  it("recovers automatically when the gateway starts before the API", async () => {
+    const mock = installFetch();
+    mock.mockResolvedValueOnce(new Response("Bad gateway", { status: 502 }));
+    render(<App />);
+    expect(screen.getByText(/Сервисы запускаются/)).toBeVisible();
+    expect(
+      await screen.findByText(/Осваивайся/, {}, { timeout: 3500 }),
+    ).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(mock.mock.calls.filter((c) => c[0] === "/api/me")).toHaveLength(2);
+  });
   it("supports disabled browser storage without losing access to the app", async () => {
     installFetch();
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
@@ -134,9 +142,10 @@ describe("application shell and identity isolation", () => {
     });
     render(<App />);
     await screen.findByText(/Осваивайся/);
-    fireEvent.change(screen.getByLabelText("Учебный профиль"), {
-      target: { value: "demo-alex" },
+    fireEvent.click(screen.getByText("Демонстрация прав доступа"));
+    fireEvent.change(screen.getByLabelText("Демо-профиль"), {
+      target: { value: "demo-mentor-platform" },
     });
-    await waitFor(() => expect(screen.getByText("А")).toBeVisible());
+    await waitFor(() => expect(screen.getByText("Н")).toBeVisible());
   });
 });

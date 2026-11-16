@@ -19,3 +19,6 @@ bin/
 /frontend/dist/
 /frontend/coverage/
 /frontend/*.tsbuildinfo
+.coverage
+/coverage/
+/backend/services/api/coverage.xml

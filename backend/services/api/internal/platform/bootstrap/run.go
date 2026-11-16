@@ -53,7 +53,7 @@ func Run(factory Factory) error {
 	if app.Close != nil {
 		defer app.Close()
 	}
-	srv := &http.Server{Addr: app.Address, Handler: app.Handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second}
+	srv := &http.Server{Addr: app.Address, Handler: app.Handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 75 * time.Second, IdleTimeout: 60 * time.Second}
 	logger.Info("server starting", "address", app.Address, "demo_mode", true)
 	return Serve(ctx, srv, app.Background)
 }

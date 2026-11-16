@@ -76,7 +76,7 @@ describe("assistant and evidence", () => {
     );
     expect(api.answer).toHaveBeenCalledWith(
       "Не открывается Jira, ошибка 403",
-      "offline",
+      "llm",
       3,
       expect.any(AbortSignal),
     );
@@ -132,10 +132,6 @@ describe("assistant and evidence", () => {
     vi.mocked(api.answer).mockRejectedValueOnce(
       new ApiError("temporarily_unavailable"),
     );
-    await user.selectOptions(screen.getByLabelText("Режим ответа"), "llm");
-    fireEvent.change(screen.getByLabelText("Количество источников"), {
-      target: { value: "5" },
-    });
     await user.type(
       screen.getByRole("textbox"),
       "Jira{Shift>}{Enter}{/Shift}403",
@@ -150,10 +146,10 @@ describe("assistant and evidence", () => {
     expect(vi.mocked(api.answer).mock.calls[1].slice(0, 3)).toEqual([
       "Jira\n403",
       "llm",
-      5,
+      3,
     ]);
     await user.click(
-      screen.getByRole("button", { name: "Показать офлайн-выдержку" }),
+      screen.getByRole("button", { name: "Найти инструкцию без модели" }),
     );
     await waitFor(() => expect(api.answer).toHaveBeenCalledTimes(3));
     expect(vi.mocked(api.answer).mock.calls[2][1]).toBe("offline");
@@ -170,9 +166,7 @@ describe("assistant and evidence", () => {
     );
     await user.type(screen.getByRole("textbox"), "Jira{Enter}{Enter}");
     expect(api.answer).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Проверяем инструкции",
-    );
+    expect(screen.getByRole("status")).toHaveTextContent("Ищем источники");
     await user.click(
       screen.getByRole("button", { name: "Остановить ожидание" }),
     );
@@ -203,13 +197,13 @@ describe("assistant and evidence", () => {
     vi.useFakeTimers();
     fireEvent.submit(screen.getByRole("textbox").closest("form")!);
     await act(async () => {
-      vi.advanceTimersByTime(40000);
+      vi.advanceTimersByTime(70000);
     });
     expect(signal?.aborted).toBe(true);
     view.unmount();
     vi.useRealTimers();
   });
-  it("rejects blank/control input and invalid top_k before calling API", async () => {
+  it("rejects blank/control input and hides internal retrieval controls", async () => {
     const { api } = setup();
     fireEvent.submit(screen.getByRole("textbox").closest("form")!);
     fireEvent.change(screen.getByRole("textbox"), {
@@ -217,12 +211,10 @@ describe("assistant and evidence", () => {
     });
     fireEvent.submit(screen.getByRole("textbox").closest("form")!);
     expect(api.answer).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("Количество источников"), {
-      target: { value: "0" },
-    });
     expect(
-      screen.getByRole("button", { name: "Отправить вопрос" }),
-    ).toBeDisabled();
+      screen.queryByLabelText("Количество источников"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Режим ответа")).not.toBeInTheDocument();
   });
   it("renders untrusted source/answer text safely and only permits safe original links", () => {
     const malicious = {

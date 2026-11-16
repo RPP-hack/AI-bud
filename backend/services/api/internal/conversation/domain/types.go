@@ -96,3 +96,16 @@ type Conversation struct {
 	ID    string `json:"id"`
 	Turns []Turn `json:"turns"`
 }
+
+type DependencyError struct{ Code string }
+
+func (e DependencyError) Error() string { return e.Code }
+
+func DependencyFailure(code string) error {
+	switch code {
+	case "search_unavailable", "model_unconfigured", "model_unavailable", "model_timeout", "model_rate_limited", "model_invalid_response", "model_incomplete":
+		return DependencyError{Code: code}
+	default:
+		return ErrUnavailable
+	}
+}

@@ -28,6 +28,12 @@ enum AnswerStatus {
   ANSWER_STATUS_INSUFFICIENT_EVIDENCE = 3;
   ANSWER_STATUS_CONFLICT = 4;
   ANSWER_STATUS_NEEDS_REVIEW = 5;
+  ANSWER_STATUS_CONVERSATION = 6;
+}
+
+message ConversationMessage {
+  string role = 1;
+  string content = 2;
 }
 
 message ConversationMessage {

@@ -10,21 +10,14 @@ retrieval/generation pipeline. Answers and searches do not create access request
 From the repository root:
 
 ```sh
-docker compose -f backend/compose.yaml up --build -d
-curl http://localhost:8001/ready
+docker compose -f docker-compose.dev.yaml up --build -d
+curl http://localhost/ready
 curl http://localhost:8080/ready
-curl -sS http://localhost:8080/api/rag/answers \
-  -H 'Authorization: Bearer demo-intern-platform' \
-  -H 'Content-Type: application/json' \
-  -d '{"question":"Не открывается Jira, ошибка 403","mode":"offline"}'
 ```
 
-Compose publishes a demo knowledge snapshot through `rag-index`, then starts
-Python with the published pgvector index and the shared local model cache. Ports 8080 (Go), 8001 (Python REST), and
-50051 (Python gRPC) are published only on loopback. Offline is the default mode.
-To request online generation, configure `RAG_LLM_API_KEY` before starting Compose
-and send `"mode":"llm"`. Missing provider configuration returns 503 when generation
-is needed; it never silently falls back to offline output.
+Configure the local `rag/.env` from its example and fill `RAG_LLM_API_KEY` before startup. The complete stack exposes the GUI/gateway on port 80 and Go on loopback port 8080. Python REST/gRPC stay internal; standalone development commands below expose them locally. A ready process does not guarantee that an external free model is accepting requests.
+
+The GUI uses persisted conversations and defaults to LLM answers. The legacy answer/search endpoints retain their explicit offline mode for tools and diagnostics.
 
 The synthetic demo accounts are:
 
@@ -102,7 +95,7 @@ origin and freshness; internal filesystem paths, roles and rule metadata are omi
 Search returns `request_id` and an ordered `sources` array. Conflict evidence may
 expand the result beyond `top_k`, matching the existing retriever.
 
-`answered`, `sources_found`, `insufficient_evidence`, `conflict`, and `needs_review`
+`answered`, `sources_found`, `insufficient_evidence`, `conflict`, `needs_review`, and `conversation`
 are successful business outcomes (HTTP 200 / gRPC OK). `mode` reports actual
 execution: `llm`, `offline`, or `rules`.
 
@@ -122,8 +115,8 @@ The standard gRPC health `Check` supports the empty service and
 LLM call. Go's existing readiness endpoint continues to check its database.
 
 The shared application admits at most 16 concurrent operations. Request bodies
-are limited to 64 KiB. The Go RPC budget is 30 seconds, its RAG HTTP handler allows
-35 seconds, and its server write timeout is 45 seconds. Python passes the remaining
+are limited to 64 KiB. The Go RPC budget is 60 seconds, its RAG HTTP handler allows
+65 seconds, and its server write timeout is 75 seconds. Python passes the remaining
 budget to generation with a maximum provider socket timeout of 25 seconds.
 There are no automatic LLM retries. The synchronous provider client cannot forcibly
 interrupt a running thread or guarantee a wall-clock bound for a slowly trickling
@@ -167,3 +160,13 @@ The `rag_integration` test launches Python, builds a temporary demo index, and
 checks Go REST → gRPC → Python, ACL filtering, and the separate confirmation flow.
 It needs no PostgreSQL or provider key. The existing `integration` tests still
 require `TEST_DATABASE_URL`.
+
+## Persisted conversations
+
+- `GET /api/conversation` returns the current owned conversation and ordered turns.
+- `POST /api/conversation/new` with `conversation_id` closes that conversation and returns a new one; reset retries do not clear a newer conversation.
+- `POST /api/conversations/{id}/messages` requires `Idempotency-Key` and accepts `question`, `mode`, `top_k`. It persists a pending turn before calling RAG, then saves the answer or safe error. A replay of pending returns 202; completed/failed returns 200. Inspect `state` and `error_code` rather than HTTP status alone.
+
+The browser cannot provide `history` or actor fields. Go supplies at most three completed exchanges (8000 characters total) through protobuf `history`. Old citations in history are not factual evidence. Expired pending turns become `interrupted` on a subsequent read. History and requests are isolated by actor; a role/team change starts a fresh conversation.
+
+`conversation` is a local general reply, without required citations. Grounded `answered` still requires sources. New safe dependency errors: `search_unavailable`, `model_unconfigured`, `model_unavailable`, `model_timeout`, `model_rate_limited`, `model_invalid_response`, `model_incomplete`. Python/legacy Go REST use 503, 504, 429 or 502 as appropriate; persisted message errors live in the saved turn. No automatic provider retry or paid fallback occurs.

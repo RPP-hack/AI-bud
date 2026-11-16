@@ -44,7 +44,7 @@ docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run 
 docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run --rm rag-cli access --confirm
 ```
 
-Том PostgreSQL хранит документы, фрагменты, векторы и тестовые заявки. Для полного стека выполните `docker compose -f backend/compose.yaml --env-file rag/.env up --build`: индексатор дождётся БД, а сервер — завершения индексации. Внутри БД RAG использует отдельную схему `rag`, не затрагивая таблицы Go API. При локальном запуске подключение задаёт `RAG_DATABASE_URL`, по умолчанию `postgresql://buddy:buddy-local@localhost:55432/buddy`. Для переноса прежней базы SQLite повторно выполните `python3 -m rag index` с исходным манифестом.
+Том PostgreSQL хранит документы, фрагменты, векторы и тестовые заявки. Для полного стека выполните `docker compose -f docker-compose.dev.yaml up --build`: индексатор дождётся БД, а сервер — завершения индексации. Внутри БД RAG использует отдельную схему `rag`, не затрагивая таблицы Go API. При локальном запуске подключение задаёт `RAG_DATABASE_URL`, по умолчанию `postgresql://buddy:buddy-local@localhost:55432/buddy`. Для переноса прежней базы SQLite повторно выполните `python3 -m rag index` с исходным манифестом.
 
 ## Семантический поиск
 
@@ -71,7 +71,7 @@ docker compose -f docker-compose.dev.yaml --env-file rag/.env --profile rag run 
 
 ## Работа с моделью
 
-По умолчанию клиент использует OpenRouter, модель `openai/gpt-4o-mini` и OpenAI-совместимый метод `/chat/completions`. Укажите свой ключ в `RAG_LLM_API_KEY`. Для другого провайдера измените `RAG_LLM_BASE_URL` и `RAG_LLM_MODEL`. Внешний сервис получит вопрос, роль, команду и отобранные разрешённые фрагменты. [Документация OpenRouter](https://openrouter.ai/docs/quickstart)
+По умолчанию клиент использует OpenRouter, фиксированную бесплатную модель `nvidia/nemotron-3.5-lightning:free` и OpenAI-совместимый метод `/chat/completions`. Укажите свой ключ в `RAG_LLM_API_KEY`. Для другого провайдера измените `RAG_LLM_BASE_URL` и `RAG_LLM_MODEL`. Внешний сервис получит вопрос, роль, команду и отобранные разрешённые фрагменты. [Документация OpenRouter](https://openrouter.ai/docs/quickstart)
 
 ```sh
 set -a
@@ -116,10 +116,10 @@ print(result.status, result.answer)
 
 ```sh
 python3 -m unittest discover -s rag/tests -v
-python3 -m pip install coverage==6.5.0 -e './rag[pdf]'
+python3 -m pip install coverage==7.17.3 -e './rag[pdf]'
 python3 -m coverage run -m unittest discover -s rag/tests
 python3 -m coverage report
-python3 -m coverage xml -o docs/coverage.xml
+python3 -m coverage xml -o docs/coverage/python.xml
 ```
 
 Для интеграционных тестов установите базовые зависимости и задайте `RAG_TEST_DATABASE_URL` — DSN PostgreSQL с pgvector и правом `CREATEDB`. Каждый тест создаёт отдельную временную БД и удаляет только её; embedding-модель заменена фиксированными векторами, чтобы проверять SQL, фильтры, транзакции и версии без сетевых расходов:
@@ -129,4 +129,6 @@ RAG_TEST_DATABASE_URL=postgresql://buddy:buddy-local@localhost:55432/buddy \
   python3 -m unittest discover -s rag/tests -p test_vector_storage.py -v
 ```
 
-Для полного прогона теста OCR нужен Tesseract с английским языком. В минимальном окружении дополнительные проверки PDF помечаются как пропущенные. Покрытие считается по всему пакету `rag`, включая CLI и тестовый адаптер заявок. Целевой порог строго выше 80%. [Отчёт Cobertura](../docs/coverage.xml)
+Для полного прогона теста OCR нужен Tesseract с английским языком. В минимальном окружении дополнительные проверки PDF помечаются как пропущенные. Покрытие считается по всему пакету `rag`, включая CLI и тестовый адаптер заявок. Целевой порог строго выше 80%. [Отчёт Cobertura](../docs/coverage/python.xml)
+
+Параметр `RAG_LLM_REASONING` принимает `off` (по умолчанию), `low` или `default`. Для другой модели проверьте поддержку reasoning; `default` не отправляет этот параметр. Общие реплики обрабатываются локально без поиска и LLM. В GUI основной режим — модель; «Найти инструкцию без модели» запускает отдельный запрос на выдержку. Сводный воспроизводимый отчёт: [покрытие](../docs/COVERAGE.md).

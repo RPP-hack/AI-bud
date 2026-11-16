@@ -1,0 +1,95 @@
+{
+  "metric": "executable line coverage",
+  "components": {
+    "backend": {
+      "covered": 910,
+      "total": 1042,
+      "files": [
+        "cmd/mock-access/main.go",
+        "cmd/server/main.go",
+        "internal/access/adapters/demo/policy.go",
+        "internal/access/adapters/memory/repository.go",
+        "internal/access/adapters/postgres/reconciliation.go",
+        "internal/access/adapters/postgres/repository.go",
+        "internal/access/adapters/tickethttp/client.go",
+        "internal/access/application/reconciler.go",
+        "internal/access/application/service.go",
+        "internal/access/domain/request.go",
+        "internal/conversation/adapters/postgres/repository.go",
+        "internal/conversation/application/service.go",
+        "internal/conversation/domain/types.go",
+        "internal/identity/demo/directory.go",
+        "internal/mocktickets/handler.go",
+        "internal/onboarding/progress.go",
+        "internal/platform/bootstrap/run.go",
+        "internal/platform/config/config.go",
+        "internal/platform/postgres/migrate.go",
+        "internal/ragclient/client.go",
+        "internal/transport/httpapi/conversation.go",
+        "internal/transport/httpapi/handler.go",
+        "internal/transport/httpapi/rag.go"
+      ],
+      "percent": 87.33
+    },
+    "rag": {
+      "covered": 1461,
+      "total": 1538,
+      "files": [
+        "src/rag/__main__.py",
+        "src/rag/access.py",
+        "src/rag/application.py",
+        "src/rag/conversation.py",
+        "src/rag/dialogue.py",
+        "src/rag/embeddings.py",
+        "src/rag/evaluation.py",
+        "src/rag/generation.py",
+        "src/rag/guardrails.py",
+        "src/rag/ingestion/__init__.py",
+        "src/rag/ingestion/chunking.py",
+        "src/rag/ingestion/indexing.py",
+        "src/rag/ingestion/loaders.py",
+        "src/rag/local_embeddings.py",
+        "src/rag/pipeline.py",
+        "src/rag/relevance.py",
+        "src/rag/retrieval.py",
+        "src/rag/storage.py",
+        "src/rag/terms.py",
+        "src/rag/transport/__init__.py",
+        "src/rag/transport/auth.py",
+        "src/rag/transport/grpc_server.py",
+        "src/rag/transport/mapping.py",
+        "src/rag/transport/rest.py",
+        "src/rag/vector_storage.py"
+      ],
+      "percent": 94.99
+    },
+    "frontend": {
+      "covered": 324,
+      "total": 334,
+      "files": [
+        "frontend/src/App.tsx",
+        "frontend/src/Assistant.tsx",
+        "frontend/src/Requests.tsx",
+        "frontend/src/api.ts",
+        "frontend/src/main.tsx",
+        "frontend/src/ui.tsx"
+      ],
+      "percent": 97.01
+    }
+  },
+  "total": {
+    "covered": 2695,
+    "total": 2914,
+    "percent": 92.48
+  },
+  "exclusions": [
+    "dependencies",
+    "tests",
+    "generated protobuf"
+  ],
+  "tools": {
+    "backend": "go test + gocover-cobertura v1.5.0",
+    "rag": "coverage.py",
+    "frontend": "Vitest V8"
+  }
+}

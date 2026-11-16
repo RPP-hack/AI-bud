@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Api, errorText, type Actor } from "./api";
+import { Api, ApiError, errorText, type Actor } from "./api";
 import { Assistant } from "./Assistant";
 import { Requests } from "./Requests";
 import { Buddy, Icon, Loading, Notice } from "./ui";
@@ -8,8 +8,6 @@ const profiles = [
   ["demo-intern-platform", "Стажёр · Platform"],
   ["demo-intern-search", "Стажёр · Search"],
   ["demo-mentor-platform", "Наставник · Platform"],
-  ["demo-alex", "Алекс · Notifications"],
-  ["demo-sam", "Сэм · Payments"],
 ];
 const pages = [
   { id: "assistant", label: "Помощник", icon: "chat" },
@@ -19,7 +17,10 @@ const pages = [
 ];
 function savedToken() {
   try {
-    return sessionStorage.getItem("buddy-profile") ?? profiles[0][0];
+    const saved = sessionStorage.getItem("buddy-profile");
+    return profiles.some(([token]) => token === saved)
+      ? saved!
+      : profiles[0][0];
   } catch {
     return profiles[0][0];
   }
@@ -42,23 +43,43 @@ export function App() {
     setActor(null);
     setError("");
     setReady("checking");
-    api
-      .me(controller.signal)
-      .then((result) => {
-        if (live) setActor(result);
-      })
-      .catch((failure) => {
-        if (live) setError(errorText(failure));
-      });
-    Promise.all([api.health(), api.ready()])
-      .then(() => {
-        if (live) setReady("ready");
-      })
-      .catch(() => {
-        if (live) setReady("unavailable");
-      });
+    let timer: ReturnType<typeof setTimeout>;
+    async function connect(retries = 0) {
+      try {
+        const result = await api.me(controller.signal);
+        if (!live) return;
+        setActor(result);
+        const status = await Promise.allSettled([
+          api.health(controller.signal),
+          api.ready(controller.signal),
+        ]);
+        if (live)
+          setReady(
+            status.every((s) => s.status === "fulfilled")
+              ? "ready"
+              : "unavailable",
+          );
+      } catch (failure) {
+        if (!live) return;
+        const transient =
+          failure instanceof ApiError &&
+          [
+            "network_error",
+            "temporarily_unavailable",
+            "deadline_exceeded",
+          ].includes(failure.code);
+        if (transient && retries < 20) {
+          timer = setTimeout(() => void connect(retries + 1), 2000);
+        } else {
+          setError(errorText(failure));
+          setReady("unavailable");
+        }
+      }
+    }
+    void connect();
     return () => {
       live = false;
+      clearTimeout(timer);
       controller.abort();
     };
   }, [api, attempt]);
@@ -124,25 +145,32 @@ export function App() {
               <br />в первый день.
             </p>
           </div>
-          <label className="profile-switch">
-            <span className="avatar">
-              {actor?.id === "alex" ? "А" : actor?.id === "sam" ? "С" : "Т"}
-            </span>
-            <span>
-              <small>Учебный профиль</small>
-              <select
-                aria-label="Учебный профиль"
-                value={token}
-                onChange={(e) => switchProfile(e.target.value)}
-              >
-                {profiles.map(([value, label]) => (
-                  <option value={value} key={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </span>
-          </label>
+          <details className="demo-profiles">
+            <summary>Демонстрация прав доступа</summary>
+            <p>
+              Переключение тестовых пользователей. Меняет доступные материалы,
+              переписку и заявки.
+            </p>
+            <label className="profile-switch">
+              <span className="avatar">
+                {actor?.role === "mentor" ? "Н" : "С"}
+              </span>
+              <span>
+                <small>Демо-профиль</small>
+                <select
+                  aria-label="Демо-профиль"
+                  value={token}
+                  onChange={(e) => switchProfile(e.target.value)}
+                >
+                  {profiles.map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </label>
+          </details>
         </div>
       </aside>
       <div className="main-shell">
@@ -167,7 +195,7 @@ export function App() {
             </div>
           ) : !actor ? (
             <div className="workspace">
-              <Loading text="Подключаем твой профиль…" />
+              <Loading text="Сервисы запускаются. Подключаем твой профиль…" />
             </div>
           ) : (
             <div key={token}>

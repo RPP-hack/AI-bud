@@ -39,6 +39,7 @@ function savedTurn(turn: ConversationTurn): Turn {
   };
 }
 const statusText: Record<Answer["status"], string> = {
+  conversation: "Давай разберёмся",
   answered: "Ответ по источникам",
   sources_found: "Выдержка из инструкции",
   insufficient_evidence: "Недостаточно сведений",
@@ -83,8 +84,8 @@ export function Assistant({
   const [loadAttempt, setLoadAttempt] = useState(0);
   const pending = turns.some((turn) => turn.state === "pending");
   const [question, setQuestion] = useState("");
-  const [mode, setMode] = useState<"offline" | "llm">("offline");
-  const [topK, setTopK] = useState(3);
+  const mode = "llm" as const;
+  const topK = 3;
   const [busy, setBusy] = useState(false);
   const [activeSources, setActiveSources] = useState<Record<string, Source>>(
     {},
@@ -189,7 +190,7 @@ export function Assistant({
     );
     setQuestion("");
     setBusy(true);
-    const timer = setTimeout(() => controller.abort(), 40000);
+    const timer = setTimeout(() => controller.abort(), 70000);
     try {
       if (turn.search) {
         const result = await api.search(
@@ -379,26 +380,28 @@ export function Assistant({
                         >
                           Повторить запрос
                         </button>
-                        {!turn.search && turn.mode === "llm" && (
-                          <button
-                            className="text-button"
-                            disabled={
-                              busy ||
-                              pending ||
-                              loading ||
-                              (!search && !conversationID)
-                            }
-                            onClick={() =>
-                              void send(turn.question, {
-                                ...turn,
-                                mode: "offline",
-                                state: "failed",
-                              })
-                            }
-                          >
-                            Показать офлайн-выдержку
-                          </button>
-                        )}
+                        {!turn.search &&
+                          turn.mode === "llm" &&
+                          turn.state !== "uncertain" && (
+                            <button
+                              className="text-button"
+                              disabled={
+                                busy ||
+                                pending ||
+                                loading ||
+                                (!search && !conversationID)
+                              }
+                              onClick={() =>
+                                void send(turn.question, {
+                                  ...turn,
+                                  mode: "offline",
+                                  state: "failed",
+                                })
+                              }
+                            >
+                              Найти инструкцию без модели
+                            </button>
+                          )}
                       </>
                     )}
                     {turn.answer && (
@@ -426,6 +429,21 @@ export function Assistant({
                             </li>
                           ))}
                         </ol>
+                        {turn.answer.status === "conversation" &&
+                          turn.answer.next_step && (
+                            <div className="quick-questions">
+                              {prompts.map((p) => (
+                                <button
+                                  className="button secondary"
+                                  key={p.title}
+                                  disabled={busy || pending || loading}
+                                  onClick={() => void send(p.question)}
+                                >
+                                  {p.title}
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         {turn.answer.next_step && (
                           <p className="callout preserve">
                             {turn.answer.next_step}
@@ -462,13 +480,13 @@ export function Assistant({
                             </button>
                           )}
                         <p className="answer-footnote">
-                          {
-                            {
-                              llm: "Ответ модели",
-                              offline: "Офлайн · без обращения к модели",
-                              rules: "Проверка по правилам",
-                            }[turn.answer.mode]
-                          }
+                          {turn.answer.status === "conversation"
+                            ? "Помощник"
+                            : {
+                                llm: "Ответ модели",
+                                offline: "Выдержка из инструкции",
+                                rules: "Проверка по правилам",
+                              }[turn.answer.mode]}
                           {turn.answer.model ? ` · ${turn.answer.model}` : ""}
                         </p>
                       </>
@@ -558,32 +576,6 @@ export function Assistant({
             }}
           />
           <div className="composer-bottom">
-            <div className="composer-options">
-              {!search && (
-                <label>
-                  <span className="sr-only">Режим ответа</span>
-                  <select
-                    value={mode}
-                    onChange={(e) => setMode(e.target.value as typeof mode)}
-                  >
-                    <option value="offline">Офлайн · источники</option>
-                    <option value="llm">С моделью</option>
-                  </select>
-                </label>
-              )}
-              <label className="top-k">
-                Источников
-                <input
-                  aria-label="Количество источников"
-                  type="number"
-                  min="1"
-                  max="50"
-                  required
-                  value={topK}
-                  onChange={(e) => setTopK(Number(e.target.value))}
-                />
-              </label>
-            </div>
             <button
               className="send-button"
               aria-label={search ? "Найти" : "Отправить вопрос"}
